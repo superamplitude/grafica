@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Finalização e Publicação · Super Admin · Central Prints</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/admin/admin-extra.css">
+  <link rel="stylesheet" href="/admin/finalizacao.css">
+</head>
+<body class="launch-page">
+  <div class="launch-shell">
+    <header class="launch-topbar">
+      <div>
+        <a href="/admin/" class="launch-back">← Super Admin</a>
+        <h1>Finalização e Publicação</h1>
+        <p>Prontidão, saneamento conservador, catálogo piloto, evidências e rollback.</p>
+      </div>
+      <div class="launch-runtime"><strong id="launchUser">Carregando…</strong><span id="launchRole"></span><small id="launchRuntime">Verificando…</small></div>
+    </header>
+
+    <section class="launch-kpis" id="launchKpis"></section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Checklist de prontidão</h2><p>Falhas críticas impedem considerar a operação comercialmente estável.</p></div><div class="score" id="launchScore">—</div></div>
+      <div class="checklist-grid" id="launchChecklist"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Validações do ambiente real</h2><p>Estas confirmações não são inferidas. Devem refletir testes reais de pagamento, entrega, e-mail e mobile.</p></div></div>
+      <div class="attestation-grid" id="attestationGrid"></div>
+    </section>
+
+    <section class="launch-columns">
+      <section class="panel">
+        <div class="panel-head"><div><h2>Saneamento conservador</h2><p>Preenche somente campos vazios a partir de dados já existentes.</p></div></div>
+        <div class="safety-box">Permitido: preço base pela menor variante pública e descrição por conteúdo já existente. Proibido: inventar texto, categoria, fornecedor ou publicar produto.</div>
+        <div class="action-row"><button class="action primary" id="repairSimulate" type="button">Simular saneamento</button></div>
+        <div id="repairPlan" class="plan-box"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><h2>Catálogo piloto</h2><p>Somente produtos completos são elegíveis; todos são revalidados no momento da publicação.</p></div></div>
+        <div class="pilot-controls"><label>Quantidade<select id="pilotLimit"><option value="5">5 produtos</option><option value="10">10 produtos</option></select></label><button class="action primary" id="pilotSimulate" type="button">Simular piloto</button></div>
+        <div id="pilotPlan" class="plan-box"></div>
+      </section>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Pendências de catálogo</h2><p>Critérios: imagem principal, categoria, descrição, variante precificada, gabarito quando exige arte e fornecedor quando terceirizado/híbrido.</p></div><div class="report-actions"><button class="action" id="downloadTxt" type="button">Relatório TXT</button><button class="action" id="downloadCsv" type="button">Pendências CSV</button></div></div>
+      <div class="table-wrap"><table class="table launch-table"><thead><tr><th>ID</th><th>Produto</th><th>Status</th><th>Pendências</th><th>Reparo seguro</th></tr></thead><tbody id="pendingRows"></tbody></table></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Execuções e rollback</h2><p>Histórico das simulações e execuções controladas.</p></div><button class="action" id="launchReload" type="button">Atualizar</button></div>
+      <div id="runHistory" class="run-history"></div>
+    </section>
+
+    <div class="launch-message" id="launchMessage"></div>
+  </div>
+  <script type="module" src="/admin/finalizacao.js"></script>
+</body>
+</html>

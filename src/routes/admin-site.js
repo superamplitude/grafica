@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getDb } from '../lib/db.js';
+import { publicObjectUrl } from '../lib/storage.js';
 
 const bannerSchema = z.object({
   name: z.string().min(2).max(190),
@@ -9,6 +10,11 @@ const bannerSchema = z.object({
   body: z.string().max(10000).nullable().optional(),
   cta_label: z.string().max(120).nullable().optional(),
   cta_url: z.string().max(500).nullable().optional(),
+  secondary_cta_label: z.string().max(120).nullable().optional(),
+  secondary_cta_url: z.string().max(500).nullable().optional(),
+  autoplay_seconds: z.number().int().min(3).max(30).optional(),
+  desktop_media_id: z.number().int().positive().nullable().optional(),
+  mobile_media_id: z.number().int().positive().nullable().optional(),
   sort_order: z.number().int().min(-100000).max(100000).optional(),
   starts_at: z.string().max(40).nullable().optional(),
   ends_at: z.string().max(40).nullable().optional(),
@@ -32,6 +38,21 @@ function dbDate(value) {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+async function validateBannerMedia(db, ids) {
+  const unique = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
+  if (!unique.length) return true;
+  const [rows] = await db.execute(`SELECT id FROM media_objects WHERE id IN (${unique.map(() => '?').join(',')}) AND kind='banner' AND visibility='public'`, unique);
+  return rows.length === unique.length;
+}
+
+function serializeBanner(row) {
+  return {
+    ...row,
+    desktop_url: row.desktop_key ? publicObjectUrl(row.desktop_key) : null,
+    mobile_url: row.mobile_key ? publicObjectUrl(row.mobile_key) : null
+  };
+}
+
 export async function registerAdminSiteRoutes(app) {
   const staff = app.requireRole('super_admin','admin','operations','prepress','support');
   const admins = app.requireRole('super_admin','admin');
@@ -39,12 +60,15 @@ export async function registerAdminSiteRoutes(app) {
   app.get('/api/v1/admin/site/banners', { preHandler: staff }, async () => {
     const db = getDb();
     const [rows] = await db.query(`
-      SELECT b.id,b.name,b.placement,b.eyebrow,b.title,b.body,b.cta_label,b.cta_url,b.sort_order,
-             b.starts_at,b.ends_at,b.status,b.desktop_media_id,b.mobile_media_id,b.created_at,b.updated_at
+      SELECT b.id,b.name,b.placement,b.eyebrow,b.title,b.body,b.cta_label,b.cta_url,b.secondary_cta_label,b.secondary_cta_url,
+             b.autoplay_seconds,b.sort_order,b.starts_at,b.ends_at,b.status,b.desktop_media_id,b.mobile_media_id,b.created_at,b.updated_at,
+             dm.object_key AS desktop_key,mm.object_key AS mobile_key
         FROM banners b
+        LEFT JOIN media_objects dm ON dm.id=b.desktop_media_id AND dm.visibility='public'
+        LEFT JOIN media_objects mm ON mm.id=b.mobile_media_id AND mm.visibility='public'
        ORDER BY b.placement,b.sort_order,b.id DESC
     `);
-    return { items: rows };
+    return { items: rows.map(serializeBanner) };
   });
 
   app.post('/api/v1/admin/site/banners', { preHandler: admins }, async (request, reply) => {
@@ -56,13 +80,19 @@ export async function registerAdminSiteRoutes(app) {
     if (startsAt === undefined || endsAt === undefined) return reply.code(400).send({ error: 'INVALID_BANNER_DATE' });
     if (startsAt && endsAt && startsAt >= endsAt) return reply.code(400).send({ error: 'INVALID_BANNER_PERIOD' });
     const db = getDb();
+    if (data.placement === 'home-hero') {
+      const [countRows] = await db.query(`SELECT COUNT(*) AS n FROM banners WHERE placement='home-hero' AND status<>'archived'`);
+      if (Number(countRows[0]?.n || 0) >= 6) return reply.code(409).send({ error: 'HERO_CAMPAIGN_LIMIT_REACHED', limit: 6 });
+    }
+    const mediaOk = await validateBannerMedia(db, [data.desktop_media_id, data.mobile_media_id]);
+    if (!mediaOk) return reply.code(409).send({ error: 'INVALID_BANNER_MEDIA' });
     const [result] = await db.execute(`
-      INSERT INTO banners (name,placement,eyebrow,title,body,cta_label,cta_url,sort_order,starts_at,ends_at,status)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)
-    `, [data.name,data.placement,data.eyebrow??null,data.title??null,data.body??null,data.cta_label??null,data.cta_url??null,data.sort_order??0,startsAt,endsAt,data.status||'draft']);
-    const [rows] = await db.execute('SELECT * FROM banners WHERE id=?', [result.insertId]);
+      INSERT INTO banners (name,placement,desktop_media_id,mobile_media_id,eyebrow,title,body,cta_label,cta_url,secondary_cta_label,secondary_cta_url,autoplay_seconds,sort_order,starts_at,ends_at,status)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `, [data.name,data.placement,data.desktop_media_id??null,data.mobile_media_id??null,data.eyebrow??null,data.title??null,data.body??null,data.cta_label??null,data.cta_url??null,data.secondary_cta_label??null,data.secondary_cta_url??null,data.autoplay_seconds??7,data.sort_order??0,startsAt,endsAt,data.status||'draft']);
+    const [rows] = await db.execute(`SELECT b.*,dm.object_key AS desktop_key,mm.object_key AS mobile_key FROM banners b LEFT JOIN media_objects dm ON dm.id=b.desktop_media_id LEFT JOIN media_objects mm ON mm.id=b.mobile_media_id WHERE b.id=?`, [result.insertId]);
     await audit(db,request,'banner.create',result.insertId,null,rows[0]);
-    return reply.code(201).send({ ok:true, banner:rows[0] });
+    return reply.code(201).send({ ok:true, banner:serializeBanner(rows[0]) });
   });
 
   app.patch('/api/v1/admin/site/banners/:id', { preHandler: admins }, async (request, reply) => {
@@ -81,11 +111,16 @@ export async function registerAdminSiteRoutes(app) {
     const effectiveStart=startsAt===undefined?before.starts_at:startsAt;
     const effectiveEnd=endsAt===undefined?before.ends_at:endsAt;
     if(effectiveStart&&effectiveEnd&&new Date(effectiveStart)>=new Date(effectiveEnd))return reply.code(400).send({error:'INVALID_BANNER_PERIOD'});
-    const map={name:data.name,placement:data.placement,eyebrow:data.eyebrow,title:data.title,body:data.body,cta_label:data.cta_label,cta_url:data.cta_url,sort_order:data.sort_order,starts_at:startsAt,ends_at:endsAt,status:data.status};
+    const mediaOk = await validateBannerMedia(db, [
+      data.desktop_media_id === undefined ? Number(before.desktop_media_id || 0) : Number(data.desktop_media_id || 0),
+      data.mobile_media_id === undefined ? Number(before.mobile_media_id || 0) : Number(data.mobile_media_id || 0)
+    ]);
+    if (!mediaOk) return reply.code(409).send({ error: 'INVALID_BANNER_MEDIA' });
+    const map={name:data.name,placement:data.placement,desktop_media_id:data.desktop_media_id,mobile_media_id:data.mobile_media_id,eyebrow:data.eyebrow,title:data.title,body:data.body,cta_label:data.cta_label,cta_url:data.cta_url,secondary_cta_label:data.secondary_cta_label,secondary_cta_url:data.secondary_cta_url,autoplay_seconds:data.autoplay_seconds,sort_order:data.sort_order,starts_at:startsAt,ends_at:endsAt,status:data.status};
     const entries=Object.entries(map).filter(([,value])=>value!==undefined);
     if(entries.length)await db.execute(`UPDATE banners SET ${entries.map(([key])=>`${key}=?`).join(',')},updated_at=NOW() WHERE id=?`,[...entries.map(([,value])=>value),id]);
-    const [afterRows]=await db.execute('SELECT * FROM banners WHERE id=?',[id]);
+    const [afterRows]=await db.execute(`SELECT b.*,dm.object_key AS desktop_key,mm.object_key AS mobile_key FROM banners b LEFT JOIN media_objects dm ON dm.id=b.desktop_media_id LEFT JOIN media_objects mm ON mm.id=b.mobile_media_id WHERE b.id=?`,[id]);
     await audit(db,request,'banner.update',id,before,afterRows[0]);
-    return {ok:true,banner:afterRows[0]};
+    return {ok:true,banner:serializeBanner(afterRows[0])};
   });
 }

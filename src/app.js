@@ -8,10 +8,12 @@ import { dbStatus } from './lib/db.js';
 import { r2Status } from './lib/storage.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
+import { registerSiteHeroRoutes } from './routes/site-hero.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAdminOrderRoutes } from './routes/admin-orders.js';
 import { registerAdminPrepressRoutes } from './routes/admin-prepress.js';
+import { registerAdminLaunchRoutes } from './routes/admin-launch.js';
 import { registerAdminCatalogRoutes } from './routes/admin-catalog.js';
 import { registerAdminSiteRoutes } from './routes/admin-site.js';
 import { registerMediaRoutes } from './routes/media.js';
@@ -60,6 +62,7 @@ export async function buildApp() {
   app.get('/api',async()=>({name:'Central Prints API',version:VERSION}));
 
   await registerPublicRoutes(app);
+  await registerSiteHeroRoutes(app);
   await registerOrderRoutes(app);
   await registerArtworkRoutes(app);
   await registerProofRoutes(app);
@@ -67,6 +70,7 @@ export async function buildApp() {
   await registerAdminRoutes(app);
   await registerAdminOrderRoutes(app);
   await registerAdminPrepressRoutes(app);
+  await registerAdminLaunchRoutes(app);
   await registerAdminCatalogRoutes(app);
   await registerAdminSiteRoutes(app);
   await registerMediaRoutes(app);

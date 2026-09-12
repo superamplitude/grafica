@@ -11,6 +11,7 @@ export const R2_PREFIXES=Object.freeze({
   THUMBNAILS:'products/thumbnails',
   MOCKUPS:'products/mockups',
   TEMPLATES:'templates',
+  SITE_BANNERS:'site/banners',
   ARTWORK_ORIGINALS:'artworks/originals',
   ARTWORK_PREVIEWS:'artworks/previews',
   ARTWORK_APPROVED:'artworks/approved',
@@ -22,7 +23,8 @@ const PUBLIC_PREFIXES = Object.freeze([
   `${R2_PREFIXES.PRODUCT_PHOTOS}/`,
   `${R2_PREFIXES.THUMBNAILS}/`,
   `${R2_PREFIXES.MOCKUPS}/`,
-  `${R2_PREFIXES.TEMPLATES}/`
+  `${R2_PREFIXES.TEMPLATES}/`,
+  `${R2_PREFIXES.SITE_BANNERS}/`
 ]);
 
 let client;

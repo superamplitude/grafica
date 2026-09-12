@@ -1,7 +1,17 @@
+const sliderStyles=document.createElement('link');sliderStyles.rel='stylesheet';sliderStyles.href='/assets/portal-slider.css';document.head.appendChild(sliderStyles);
 const money = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const categoryGrid=document.querySelector('#categoryGrid');
 const productGrid=document.querySelector('#productGrid');
 const catalogStatus=document.querySelector('#catalogStatus');
+const heroSection=document.querySelector('.hero');
+const heroVisual=document.querySelector('#heroVisual');
+const defaultHeroVisualHtml=heroVisual?.innerHTML||'';
+const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches||false;
+let heroCampaigns=[];
+let heroIndex=0;
+let heroTimer=null;
+let heroBase=null;
+let touchStartX=null;
 
 function escapeHtml(value=''){return String(value).replace(/[&<>'"]/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
 function readCart(){try{return JSON.parse(localStorage.getItem('cp-cart')||'[]')}catch{return[]}}
@@ -23,9 +33,107 @@ async function getJson(url){
   return response.json();
 }
 
+function captureHeroBase(){
+  heroBase={
+    eyebrow:document.querySelector('#heroEyebrow')?.textContent||'',
+    title:document.querySelector('#heroTitle')?.textContent||'',
+    body:document.querySelector('#heroBody')?.textContent||'',
+    primaryLabel:document.querySelector('#heroPrimary')?.textContent||'',
+    primaryUrl:document.querySelector('#heroPrimary')?.getAttribute('href')||'/catalogo.html',
+    secondaryLabel:document.querySelector('#heroSecondary')?.textContent||'',
+    secondaryUrl:document.querySelector('#heroSecondary')?.getAttribute('href')||'#como-funciona'
+  };
+}
+
+function responsiveCampaignImage(campaign){
+  const mobile=window.matchMedia?.('(max-width: 640px)')?.matches;
+  return mobile?(campaign.mobile_url||campaign.desktop_url):(campaign.desktop_url||campaign.mobile_url);
+}
+
+function clearHeroTimer(){if(heroTimer){clearTimeout(heroTimer);heroTimer=null;}}
+function scheduleHeroTimer(){
+  clearHeroTimer();
+  if(reducedMotion||heroCampaigns.length<2)return;
+  const campaign=heroCampaigns[heroIndex];
+  const seconds=Math.min(30,Math.max(3,Number(campaign?.autoplay_seconds||7)));
+  heroTimer=setTimeout(()=>showHero((heroIndex+1)%heroCampaigns.length,true),seconds*1000);
+}
+
+function updateHeroDots(){
+  document.querySelectorAll('[data-hero-dot]').forEach((dot)=>{
+    const active=Number(dot.dataset.heroDot)===heroIndex;
+    dot.classList.toggle('active',active);
+    dot.setAttribute('aria-current',active?'true':'false');
+  });
+}
+
+function applyHeroCampaign(campaign){
+  if(!heroBase)captureHeroBase();
+  document.querySelector('#heroEyebrow').textContent=campaign?.eyebrow||heroBase.eyebrow;
+  document.querySelector('#heroTitle').textContent=campaign?.title||heroBase.title;
+  document.querySelector('#heroBody').textContent=campaign?.body||heroBase.body;
+  const primary=document.querySelector('#heroPrimary');
+  primary.textContent=campaign?.cta_label||heroBase.primaryLabel;
+  primary.href=campaign?.cta_url||heroBase.primaryUrl;
+  const secondary=document.querySelector('#heroSecondary');
+  secondary.textContent=campaign?.secondary_cta_label||heroBase.secondaryLabel;
+  secondary.href=campaign?.secondary_cta_url||heroBase.secondaryUrl;
+
+  const image=campaign?responsiveCampaignImage(campaign):null;
+  if(image&&heroVisual){
+    heroVisual.style.background=`url("${String(image).replaceAll('"','%22')}") center/cover no-repeat`;
+    heroVisual.innerHTML='';
+    heroVisual.classList.add('has-image');
+  }else if(heroVisual){
+    heroVisual.style.background='';
+    heroVisual.innerHTML=defaultHeroVisualHtml;
+    heroVisual.classList.remove('has-image');
+  }
+}
+
+function showHero(index,fromAuto=false){
+  if(!heroCampaigns.length)return;
+  heroIndex=(index+heroCampaigns.length)%heroCampaigns.length;
+  applyHeroCampaign(heroCampaigns[heroIndex]);
+  updateHeroDots();
+  if(!fromAuto||document.visibilityState==='visible')scheduleHeroTimer();
+}
+
+function renderHeroControls(){
+  document.querySelector('#heroSliderControls')?.remove();
+  if(heroCampaigns.length<2){scheduleHeroTimer();return;}
+  const controls=document.createElement('div');
+  controls.id='heroSliderControls';
+  controls.className='hero-slider-controls container';
+  controls.innerHTML=`<button type="button" class="hero-arrow" data-hero-prev aria-label="Campanha anterior">‹</button><div class="hero-dots" role="tablist" aria-label="Campanhas">${heroCampaigns.map((_,i)=>`<button type="button" data-hero-dot="${i}" aria-label="Campanha ${i+1}"></button>`).join('')}</div><button type="button" class="hero-arrow" data-hero-next aria-label="Próxima campanha">›</button>`;
+  heroSection?.appendChild(controls);
+  controls.querySelector('[data-hero-prev]').onclick=()=>showHero(heroIndex-1);
+  controls.querySelector('[data-hero-next]').onclick=()=>showHero(heroIndex+1);
+  controls.querySelectorAll('[data-hero-dot]').forEach((dot)=>dot.onclick=()=>showHero(Number(dot.dataset.heroDot)));
+  if(heroSection){
+    heroSection.tabIndex=0;
+    heroSection.onkeydown=(event)=>{if(event.key==='ArrowLeft'){event.preventDefault();showHero(heroIndex-1)}if(event.key==='ArrowRight'){event.preventDefault();showHero(heroIndex+1)}};
+    heroSection.onmouseenter=clearHeroTimer;
+    heroSection.onmouseleave=scheduleHeroTimer;
+    heroSection.onfocusin=clearHeroTimer;
+    heroSection.onfocusout=scheduleHeroTimer;
+    heroSection.ontouchstart=(event)=>{touchStartX=event.changedTouches?.[0]?.clientX??null};
+    heroSection.ontouchend=(event)=>{const end=event.changedTouches?.[0]?.clientX??null;if(touchStartX==null||end==null)return;const delta=end-touchStartX;touchStartX=null;if(Math.abs(delta)>45)showHero(heroIndex+(delta<0?1:-1))};
+  }
+  updateHeroDots();
+  scheduleHeroTimer();
+}
+
+function setupHeroCampaigns(items){
+  heroCampaigns=(Array.isArray(items)?items:[]).slice(0,6);
+  heroIndex=0;
+  if(heroCampaigns.length)applyHeroCampaign(heroCampaigns[0]);
+  renderHeroControls();
+}
+
 async function loadHomeContent(){
   try{
-    const data=await getJson('/api/v1/site/home');
+    const [data,heroData]=await Promise.all([getJson('/api/v1/site/home'),getJson('/api/v1/site/hero')]);
     const blocks=data.blocks||{};
     if(blocks.topbar?.content?.text)document.querySelector('#topbarText').textContent=blocks.topbar.content.text;
     if(blocks.hero){
@@ -49,18 +157,9 @@ async function loadHomeContent(){
       if(blocks.templates.content?.ctaUrl)cta.href=blocks.templates.content.ctaUrl;
     }
     if(blocks.footer?.content?.body)document.querySelector('#footerBody').textContent=blocks.footer.content.body;
-
-    const campaign=(data.banners||[]).find((b)=>b.placement==='home-hero');
-    if(campaign){
-      if(campaign.eyebrow)document.querySelector('#heroEyebrow').textContent=campaign.eyebrow;
-      if(campaign.title)document.querySelector('#heroTitle').textContent=campaign.title;
-      if(campaign.body)document.querySelector('#heroBody').textContent=campaign.body;
-      const primary=document.querySelector('#heroPrimary');
-      if(campaign.cta_label)primary.textContent=campaign.cta_label;
-      if(campaign.cta_url)primary.href=campaign.cta_url;
-      if(campaign.desktop_url){document.querySelector('#heroVisual').style.background=`url("${campaign.desktop_url}") center/cover no-repeat`;document.querySelector('#heroVisual').innerHTML='';}
-    }
-  }catch(error){console.info('Conteúdo editorial indisponível:',error.message);}
+    captureHeroBase();
+    setupHeroCampaigns(heroData.items||[]);
+  }catch(error){console.info('Conteúdo editorial indisponível:',error.message);captureHeroBase();}
 }
 
 async function loadCategories(){
@@ -90,6 +189,8 @@ async function loadProducts(){
 
 const searchForm=document.querySelector('#searchForm');
 if(searchForm)searchForm.addEventListener('submit',(event)=>{event.preventDefault();const q=document.querySelector('#searchInput').value.trim();location.href=`/catalogo.html${q?`?q=${encodeURIComponent(q)}`:''}`;});
+window.addEventListener('resize',()=>{if(heroCampaigns.length)applyHeroCampaign(heroCampaigns[heroIndex])});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')clearHeroTimer();else scheduleHeroTimer()});
 
 updateCartCount();
 await Promise.allSettled([loadHomeContent(),loadCategories(),loadProducts()]);

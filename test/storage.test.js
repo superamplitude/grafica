@@ -14,10 +14,13 @@ process.env.R2_PRIVATE_BUCKET = 'central-prints-private';
 process.env.R2_PUBLIC_BASE_URL = 'https://cdn.example.test';
 delete process.env.R2_BUCKET;
 
-test('R2 routes catalog media to public bucket', () => {
+test('R2 routes catalog and site media to public bucket', () => {
   assert.equal(isPublicObjectKey('products/photos/2026/09/a.webp'), true);
   assert.equal(bucketForKey('products/photos/2026/09/a.webp'), 'central-prints-public');
   assert.equal(bucketForKey('templates/gabarito.pdf'), 'central-prints-public');
+  assert.equal(isPublicObjectKey('site/banners/2026/09/hero.webp'), true);
+  assert.equal(bucketForKey('site/banners/2026/09/hero.webp'), 'central-prints-public');
+  assert.equal(publicObjectUrl('site/banners/hero.webp'), 'https://cdn.example.test/site/banners/hero.webp');
 });
 
 test('R2 routes customer and production files to private bucket', () => {
