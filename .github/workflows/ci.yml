@@ -19,6 +19,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Validate deployment shell syntax
+        run: |
+          set -Eeuo pipefail
+          for script in deploy/*.sh; do
+            echo "bash -n $script"
+            bash -n "$script"
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
