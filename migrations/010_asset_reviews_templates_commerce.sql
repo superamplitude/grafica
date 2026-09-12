@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS commerce_integrations (
   provider_code VARCHAR(80) NOT NULL,
   display_name VARCHAR(190) NOT NULL,
   integration_mode ENUM('manual','api','redirect','aggregator') NOT NULL DEFAULT 'manual',
+  adapter_status ENUM('planned','implemented','verified') NOT NULL DEFAULT 'planned',
   status ENUM('inactive','testing','active','blocked') NOT NULL DEFAULT 'inactive',
   capabilities_json JSON NULL,
   config_json JSON NULL,
@@ -46,20 +47,20 @@ CREATE TABLE IF NOT EXISTS commerce_integrations (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_commerce_provider (integration_type,provider_code),
-  KEY idx_commerce_status (integration_type,status),
+  KEY idx_commerce_status (integration_type,status,adapter_status),
   CONSTRAINT fk_commerce_verified_user FOREIGN KEY (verified_by_user_id) REFERENCES staff_users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO commerce_integrations (integration_type,provider_code,display_name,integration_mode,status,capabilities_json,secret_env_json,notes) VALUES
-('payment','mercado_pago','Mercado Pago','api','inactive',JSON_ARRAY('pix','credit_card','boleto'),JSON_ARRAY('MERCADO_PAGO_ACCESS_TOKEN','MERCADO_PAGO_WEBHOOK_SECRET'),'Conector preparado; ativar somente após credenciais, webhook e compra de homologação.'),
-('payment','pagarme','Pagar.me','api','inactive',JSON_ARRAY('pix','credit_card','boleto'),JSON_ARRAY('PAGARME_SECRET_KEY','PAGARME_WEBHOOK_SECRET'),'Conector preparado; ativar somente após credenciais e homologação.'),
-('payment','asaas','Asaas','api','inactive',JSON_ARRAY('pix','credit_card','boleto'),JSON_ARRAY('ASAAS_API_KEY','ASAAS_WEBHOOK_SECRET'),'Conector preparado; ativar somente após credenciais e homologação.'),
-('payment','efi','Efí Bank','api','inactive',JSON_ARRAY('pix','credit_card','boleto'),JSON_ARRAY('EFI_CLIENT_ID','EFI_CLIENT_SECRET','EFI_PIX_CERT_PATH'),'Conector preparado; ativar somente após credenciais/certificado e homologação.'),
-('shipping','melhor_envio','Melhor Envio','aggregator','inactive',JSON_ARRAY('quote','label','tracking'),JSON_ARRAY('MELHOR_ENVIO_TOKEN'),'Agregador logístico. Ativar apenas após cotação e etiqueta testadas.'),
-('shipping','correios','Correios','api','inactive',JSON_ARRAY('quote','tracking'),JSON_ARRAY('CORREIOS_USER','CORREIOS_ACCESS_TOKEN','CORREIOS_CONTRACT'),'Integração direta preparada para configuração futura.'),
-('shipping','jadlog','Jadlog','api','inactive',JSON_ARRAY('quote','tracking'),JSON_ARRAY('JADLOG_TOKEN'),'Integração direta preparada para configuração futura.'),
-('shipping','loggi','Loggi','api','inactive',JSON_ARRAY('quote','tracking'),JSON_ARRAY('LOGGI_API_KEY'),'Integração direta preparada para configuração futura.'),
-('shipping','azul_cargo','Azul Cargo Express','api','inactive',JSON_ARRAY('quote','tracking'),JSON_ARRAY('AZUL_CARGO_CREDENTIALS'),'Integração direta preparada para configuração futura.'),
-('shipping','local_pickup','Retirada local','manual','inactive',JSON_ARRAY('pickup'),JSON_ARRAY(),'Habilitar somente quando endereço, horários e regras de retirada estiverem confirmados.'),
-('shipping','supplier_delivery','Entrega do fornecedor','manual','inactive',JSON_ARRAY('manual_quote','tracking'),JSON_ARRAY(),'Uso interno para produção terceirizada; não expõe o fornecedor ao cliente.')
-ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),integration_mode=VALUES(integration_mode),capabilities_json=VALUES(capabilities_json),secret_env_json=VALUES(secret_env_json),notes=VALUES(notes);
+INSERT INTO commerce_integrations (integration_type,provider_code,display_name,integration_mode,adapter_status,status,capabilities_json,secret_env_json,notes) VALUES
+('payment','mercado_pago','Mercado Pago','api','planned','inactive',JSON_ARRAY('pix','credit_card','boleto'),JSON_ARRAY('MERCADO_PAGO_ACCESS_TOKEN','MERCADO_PAGO_WEBHOOK_SECRET'),'Conector cadastrado para implementação/homologação. Não é exposto ao checkout enquanto não estiver verificado.'),
+('payment','pagarme','Pagar.me','api','planned','inactive',JSON_ARRAY('pix','credit_card','boleto'),JSON_ARRAY('PAGARME_SECRET_KEY','PAGARME_WEBHOOK_SECRET'),'Conector cadastrado para implementação/homologação. Não é exposto ao checkout enquanto não estiver verificado.'),
+('payment','asaas','Asaas','api','planned','inactive',JSON_ARRAY('pix','credit_card','boleto'),JSON_ARRAY('ASAAS_API_KEY','ASAAS_WEBHOOK_SECRET'),'Conector cadastrado para implementação/homologação. Não é exposto ao checkout enquanto não estiver verificado.'),
+('payment','efi','Efí Bank','api','planned','inactive',JSON_ARRAY('pix','credit_card','boleto'),JSON_ARRAY('EFI_CLIENT_ID','EFI_CLIENT_SECRET','EFI_PIX_CERT_PATH'),'Conector cadastrado para implementação/homologação. Não é exposto ao checkout enquanto não estiver verificado.'),
+('shipping','melhor_envio','Melhor Envio','aggregator','planned','inactive',JSON_ARRAY('quote','label','tracking'),JSON_ARRAY('MELHOR_ENVIO_TOKEN'),'Agregador logístico cadastrado para implementação/homologação.'),
+('shipping','correios','Correios','api','planned','inactive',JSON_ARRAY('quote','tracking'),JSON_ARRAY('CORREIOS_USER','CORREIOS_ACCESS_TOKEN','CORREIOS_CONTRACT'),'Integração direta cadastrada para implementação futura.'),
+('shipping','jadlog','Jadlog','api','planned','inactive',JSON_ARRAY('quote','tracking'),JSON_ARRAY('JADLOG_TOKEN'),'Integração direta cadastrada para implementação futura.'),
+('shipping','loggi','Loggi','api','planned','inactive',JSON_ARRAY('quote','tracking'),JSON_ARRAY('LOGGI_API_KEY'),'Integração direta cadastrada para implementação futura.'),
+('shipping','azul_cargo','Azul Cargo Express','api','planned','inactive',JSON_ARRAY('quote','tracking'),JSON_ARRAY('AZUL_CARGO_CREDENTIALS'),'Integração direta cadastrada para implementação futura.'),
+('shipping','local_pickup','Retirada local','manual','implemented','inactive',JSON_ARRAY('pickup'),JSON_ARRAY(),'Habilitar somente quando endereço, horários e regras de retirada estiverem confirmados.'),
+('shipping','supplier_delivery','Entrega do fornecedor','manual','implemented','inactive',JSON_ARRAY('manual_quote','tracking'),JSON_ARRAY(),'Uso interno para produção terceirizada; o fornecedor não deve ser exposto ao cliente.')
+ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),integration_mode=VALUES(integration_mode),adapter_status=VALUES(adapter_status),capabilities_json=VALUES(capabilities_json),secret_env_json=VALUES(secret_env_json),notes=VALUES(notes);
