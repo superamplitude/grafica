@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { getDb } from '../lib/db.js';
 import { headObject, R2_PREFIXES, r2Buckets, r2Status, signedReadUrl, signedUploadUrl } from '../lib/storage.js';
 
-const kinds = ['product-photo','thumbnail','mockup','template','artwork-original','artwork-preview','artwork-approved','proof','production'];
+const kinds = ['product-photo','thumbnail','mockup','template','banner','artwork-original','artwork-preview','artwork-approved','proof','production'];
 const kindEnum = z.enum(kinds);
 
 const uploadSchema = z.object({
@@ -30,6 +30,7 @@ const kindConfig = Object.freeze({
   thumbnail: { prefix: R2_PREFIXES.THUMBNAILS, visibility: 'public', maxBytes: 10*MB, types: ['image/jpeg','image/png','image/webp','image/avif'] },
   mockup: { prefix: R2_PREFIXES.MOCKUPS, visibility: 'public', maxBytes: 40*MB, types: ['image/jpeg','image/png','image/webp','image/avif'] },
   template: { prefix: R2_PREFIXES.TEMPLATES, visibility: 'public', maxBytes: 250*MB, types: ['application/pdf','image/svg+xml','application/postscript','application/zip','application/x-zip-compressed','application/octet-stream'] },
+  banner: { prefix: R2_PREFIXES.SITE_BANNERS, visibility: 'public', maxBytes: 40*MB, types: ['image/jpeg','image/png','image/webp','image/avif'] },
   'artwork-original': { prefix: R2_PREFIXES.ARTWORK_ORIGINALS, visibility: 'private', maxBytes: 750*MB, types: ['application/pdf','image/jpeg','image/png','image/tiff','image/svg+xml','application/postscript','application/zip','application/x-zip-compressed','application/octet-stream'] },
   'artwork-preview': { prefix: R2_PREFIXES.ARTWORK_PREVIEWS, visibility: 'private', maxBytes: 50*MB, types: ['image/jpeg','image/png','image/webp','application/pdf'] },
   'artwork-approved': { prefix: R2_PREFIXES.ARTWORK_APPROVED, visibility: 'private', maxBytes: 750*MB, types: ['application/pdf','image/jpeg','image/png','image/tiff','image/svg+xml','application/postscript','application/zip','application/x-zip-compressed','application/octet-stream'] },
