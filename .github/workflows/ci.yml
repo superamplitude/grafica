@@ -14,23 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node 22
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
-
       - name: Install dependencies and build lockfile
         run: npm install --omit=dev
-
       - name: Static and runtime verification
         run: npm run verify
-
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
-
       - name: Export package lock
         if: success()
         uses: actions/upload-artifact@v4
@@ -39,3 +32,65 @@ jobs:
           path: package-lock.json
           if-no-files-found: error
           retention-days: 3
+
+  mysql-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: central_prints
+          MYSQL_USER: central_prints
+          MYSQL_PASSWORD: testpass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -prootpass"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: central_prints
+      DB_USER: central_prints
+      DB_PASSWORD: testpass
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --omit=dev
+      - name: Apply migrations twice and verify integrity
+        run: npm run migrate && npm run migrate && npm run schema:verify
+
+  mariadb-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_ROOT_PASSWORD: rootpass
+          MARIADB_DATABASE: central_prints
+          MARIADB_USER: central_prints
+          MARIADB_PASSWORD: testpass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: central_prints
+      DB_USER: central_prints
+      DB_PASSWORD: testpass
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --omit=dev
+      - name: Apply migrations twice and verify integrity
+        run: npm run migrate && npm run migrate && npm run schema:verify
