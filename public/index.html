@@ -2,29 +2,38 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Central Prints</title>
-  <meta name="description" content="Central Prints — gráfica online Bela Stock">
-  <style>
-    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#173126;background:#f5f7f5}
-    *{box-sizing:border-box}body{margin:0}.top{background:#123c2d;color:white;padding:18px 5vw;display:flex;align-items:center;justify-content:space-between}.brand{font-weight:800;font-size:1.35rem}.tag{opacity:.75;font-size:.9rem}.hero{min-height:72vh;display:grid;place-items:center;padding:64px 5vw}.card{width:min(980px,100%);background:white;border:1px solid #dce6df;border-radius:24px;padding:48px;box-shadow:0 18px 55px rgba(18,60,45,.08)}h1{font-size:clamp(2.2rem,6vw,4.8rem);line-height:.95;margin:0 0 22px;color:#123c2d}.accent{color:#ef7d00}.lead{font-size:1.15rem;line-height:1.7;max-width:740px;color:#4d6258}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-top:30px}.item{border:1px solid #e3e9e5;border-radius:16px;padding:18px;background:#fbfcfb}.item strong{display:block;margin-bottom:6px}.status{margin-top:30px;padding:14px 16px;border-radius:12px;background:#eef7f1;font-weight:600}.foot{padding:0 5vw 36px;text-align:center;color:#6b7c73}
-  </style>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Central Prints · Gráfica Online</title>
+  <meta name="description" content="Gráfica online com configuração inteligente, gabaritos profissionais e acompanhamento do pedido.">
+  <link rel="stylesheet" href="/assets/portal.css">
 </head>
 <body>
-  <header class="top"><div class="brand">CENTRAL <span class="accent">PRINTS</span></div><div class="tag">Bela Stock</div></header>
-  <main class="hero">
-    <section class="card">
-      <h1>Impressos que conectam,<br><span class="accent">qualidade que representa.</span></h1>
-      <p class="lead">A nova Central Prints está sendo reconstruída em Node.js, com catálogo gráfico, configurador, gabaritos, artes, provas, produção e fornecedores em uma única plataforma.</p>
-      <div class="grid">
-        <div class="item"><strong>Catálogo</strong>Produtos, variações e preços.</div>
-        <div class="item"><strong>Configurador</strong>Medidas, acabamentos e quantidade.</div>
-        <div class="item"><strong>Pré-impressão</strong>Arte, prova e validação técnica.</div>
-        <div class="item"><strong>Cloudflare R2</strong>Fotos, mockups, gabaritos e arquivos.</div>
-      </div>
-      <div class="status">Base Node ativa — reconstrução em andamento.</div>
-    </section>
+  <div class="topbar"><div class="container topbar-inner"><span id="topbarText">Frete para todo o Brasil • Produção acompanhada do início ao fim</span><nav><a href="#atendimento">Atendimento</a><a href="#atendimento">WhatsApp</a></nav></div></div>
+  <header class="header">
+    <div class="container header-main">
+      <button class="menu-button" id="menuButton" aria-label="Abrir menu">☰</button>
+      <a class="brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a>
+      <form class="search" id="searchForm"><input id="searchInput" type="search" placeholder="O que você está procurando?" autocomplete="off"><button>Buscar</button></form>
+      <div class="quick"><a href="/admin/">Minha conta</a><a href="#carrinho">Carrinho <b id="cartCount">0</b></a></div>
+    </div>
+    <div class="navrow"><div class="container nav-inner"><button class="all-products" id="allProducts">☰ Todos os produtos</button><nav id="primaryNav"><a href="#produtos">Personalizados</a><a href="#categorias">Papelaria</a><a href="#categorias">Brindes</a><a href="#categorias">Embalagens</a><a href="#categorias">Comunicação visual</a><a class="offer" href="#produtos">Destaques</a></nav></div></div>
+  </header>
+
+  <main>
+    <section class="hero"><div class="container hero-grid"><div class="hero-copy"><span class="eyebrow" id="heroEyebrow">Gráfica online inteligente</span><h1 id="heroTitle">Impressos que conectam, qualidade que representa.</h1><p id="heroBody">Configure seu produto, baixe o gabarito e envie a arte agora ou depois da compra.</p><div class="hero-actions"><a class="btn primary" id="heroPrimary" href="#produtos">Ver produtos</a><a class="btn secondary" id="heroSecondary" href="#como-funciona">Como funciona</a></div></div><div class="hero-visual" id="heroVisual"><div class="print-stack"><div></div><div></div><div><strong>Central Prints</strong><span>Identidade em cada detalhe.</span></div></div></div></div></section>
+
+    <section class="trust"><div class="container trust-grid" id="trustGrid"><article><i>✓</i><div><strong>Compra segura</strong><span>Ambiente protegido</span></div></article><article><i>★</i><div><strong>Qualidade</strong><span>Impressão profissional</span></div></article><article><i>↗</i><div><strong>Produção ágil</strong><span>Prazos transparentes</span></div></article><article><i>✎</i><div><strong>Personalização</strong><span>Arte agora ou depois</span></div></article><article><i>☏</i><div><strong>Atendimento</strong><span>Suporte humano</span></div></article></div></section>
+
+    <section class="section" id="categorias"><div class="container"><div class="section-head"><div><span>Encontre rapidamente</span><h2>Categorias de produtos</h2><p>Um catálogo organizado para você chegar mais rápido ao produto certo.</p></div><a href="#produtos">Ver todos os produtos →</a></div><div class="category-grid" id="categoryGrid"><div class="loading">Carregando categorias…</div></div></div></section>
+
+    <section class="section products-section" id="produtos"><div class="container"><div class="section-head"><div><span>Catálogo</span><h2>Produtos em destaque</h2><p>Escolha uma opção e configure formato, impressão, quantidade e prazo.</p></div><span id="catalogStatus"></span></div><div class="product-grid" id="productGrid"><div class="loading">Carregando produtos…</div></div></div></section>
+
+    <section class="how section" id="como-funciona"><div class="container"><div class="section-head"><div><span>Fluxo simples</span><h2>Da configuração à produção</h2></div></div><div class="steps"><article><b>1</b><h3>Configure</h3><p>Escolha formato, quantidade, impressão, acabamento e prazo.</p></article><article><b>2</b><h3>Envie a arte</h3><p>Envie agora, depois da compra ou solicite criação e ajuste.</p></article><article><b>3</b><h3>Aprove a prova</h3><p>O arquivo passa pela validação técnica antes da liberação.</p></article><article><b>4</b><h3>Acompanhe</h3><p>Veja produção, acabamento, expedição e rastreamento.</p></article></div></div></section>
+
+    <section class="promo" id="gabaritos"><div class="container promo-inner"><div><span>Do arquivo à entrega</span><h2 id="templatesTitle">Gabaritos profissionais e envio de arte sem complicação.</h2><p id="templatesBody">Baixe o arquivo correto antes da compra e envie a sua arte no momento mais conveniente.</p></div><a class="btn light" id="templatesCta" href="#produtos">Escolher produto</a></div></section>
   </main>
-  <footer class="foot">Central Prints · grafica.belastock.com.br</footer>
+
+  <footer id="atendimento"><div class="footer-cta"><div class="container"><div><span>Atendimento especializado</span><h2>Seu projeto merece impressão de qualidade.</h2><p>Configure com segurança e acompanhe cada etapa.</p></div><a class="btn light" href="#produtos">Começar agora</a></div></div><div class="container footer-grid"><div><a class="brand footer-brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a><p id="footerBody">Gráfica online com configuração inteligente, gabaritos profissionais e acompanhamento do pedido.</p></div><div><h3>Compre</h3><a href="#produtos">Todos os produtos</a><a href="/admin/">Minha conta</a></div><div><h3>Atendimento</h3><a href="#atendimento">WhatsApp</a><a href="#atendimento">Fale conosco</a></div><div><h3>Informações</h3><a href="#">Privacidade</a><a href="#">Termos e condições</a></div></div></footer>
+  <script type="module" src="/assets/portal.js"></script>
 </body>
 </html>
