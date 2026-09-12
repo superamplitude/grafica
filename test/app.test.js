@@ -15,6 +15,21 @@ test('GET / serves Central Prints home', async () => {
   assert.match(response.body, /Central Prints/i);
 });
 
+for (const [url, marker] of [
+  ['/catalogo.html', /Catálogo Central Prints/i],
+  ['/produto.html', /Configurar produto/i],
+  ['/checkout.html', /Finalizar/i],
+  ['/pedido.html', /Acompanhe sua solicitação/i],
+  ['/admin/', /Super Admin/i],
+  ['/admin/catalogo.html', /Editor de Catálogo/i]
+]) {
+  test(`GET ${url} serves essential site page`, async () => {
+    const response = await app.inject({ method: 'GET', url });
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, marker);
+  });
+}
+
 test('GET /api returns service metadata', async () => {
   const response = await app.inject({ method: 'GET', url: '/api' });
   assert.equal(response.statusCode, 200);
