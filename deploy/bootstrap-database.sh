@@ -45,9 +45,8 @@ legacy_db_ok(){
 }
 
 # CloudPanel rejeita nomes com underscore no fluxo db:add. Se este for o antigo
-# default ainda nao criado, migra o nome de configuracao para um identificador
-# simples compativel antes de chamar a CLI. Um banco legado funcional nunca e
-# renomeado automaticamente.
+# default ainda nao criado, migra apenas a configuracao para um identificador
+# simples compativel. Um banco legado funcional nunca e renomeado automaticamente.
 if [[ "$DB_NAME" == *_* || "$DB_USER" == *_* ]]; then
   if legacy_db_ok "$DB_NAME" "$DB_USER"; then
     echo "[INFO] Banco legado com underscore ja existe e esta acessivel; mantendo nomes atuais."
@@ -66,7 +65,7 @@ fi
 [ ${#DB_NAME} -le 64 ] || fail "DB_NAME excede 64 caracteres."
 [ ${#DB_USER} -le 32 ] || fail "DB_USER excede 32 caracteres."
 
-log "Persistindo configuracao dedicada antes da criacao do banco"
+log "Persistindo configuracao dedicada antes da criacao/recuperacao do banco"
 python3 - "$ENV_FILE" "$DB_NAME" "$DB_USER" "$DB_PASSWORD" "$JWT_SECRET" <<'PY'
 from pathlib import Path
 import sys
@@ -100,6 +99,29 @@ app_db_ok(){
   MYSQL_PWD="$DB_PASSWORD" mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u "$DB_USER" -D "$DB_NAME" -NBe 'SELECT 1' 2>/dev/null | grep -qx '1'
 }
 
+# Recuperacao especifica e limitada para o caso em que o banco foi criado
+# manualmente com a senha provisoria literal "...". A senha provisoria nunca
+# e persistida no .env. O proprio usuario autenticado troca a propria senha,
+# sem usar credencial master do servidor e sem tocar em outros bancos.
+manual_placeholder_db_ok(){
+  MYSQL_PWD='...' mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u "$DB_USER" -D "$DB_NAME" -NBe 'SELECT 1' 2>/dev/null | grep -qx '1'
+}
+
+rotate_manual_placeholder_password(){
+  local version sql
+  version="$(MYSQL_PWD='...' mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u "$DB_USER" -D "$DB_NAME" -NBe 'SELECT VERSION()' 2>/dev/null || true)"
+  [ -n "$version" ] || return 1
+
+  # DB_PASSWORD e gerada como hex e, portanto, nao contem aspas ou metacaracteres SQL.
+  if [[ "$version" == *MariaDB* ]]; then
+    sql="ALTER USER CURRENT_USER() IDENTIFIED BY '$DB_PASSWORD';"
+  else
+    sql="ALTER USER USER() IDENTIFIED BY '$DB_PASSWORD';"
+  fi
+
+  MYSQL_PWD='...' mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u "$DB_USER" -D "$DB_NAME" -e "$sql" >/dev/null 2>&1
+}
+
 show_cloudpanel_log(){
   local logfile="$1"
   [ -f "$logfile" ] || return 0
@@ -116,9 +138,7 @@ PY
   echo "===================================================="
 }
 
-log "Verificando se o banco dedicado ja esta acessivel"
-if app_db_ok; then
-  echo "DB_PREEXISTENTE=sim"
+backup_existing_db(){
   log "Criando backup CloudPanel antes das migrations"
   DB_BACKUP="$BACKUP_DIR/${DB_NAME}.before.sql.gz"
   if clpctl db:export --databaseName="$DB_NAME" --file="$DB_BACKUP" >"$BACKUP_DIR/clpctl-db-export.log" 2>&1; then
@@ -129,6 +149,18 @@ if app_db_ok; then
     cat "$BACKUP_DIR/clpctl-db-export.log" >&2 || true
     fail "Banco existente detectado, mas o CloudPanel nao conseguiu exporta-lo. Migrations nao serao executadas sem backup."
   fi
+}
+
+log "Verificando se o banco dedicado ja esta acessivel"
+if app_db_ok; then
+  echo "DB_PREEXISTENTE=sim"
+  backup_existing_db
+elif manual_placeholder_db_ok; then
+  echo "[INFO] Banco manual detectado com credencial provisoria; rotacionando senha sem recriar banco."
+  rotate_manual_placeholder_password || fail "Nao foi possivel trocar a senha provisoria do usuario do banco. Nada foi migrado."
+  app_db_ok || fail "Senha foi rotacionada, mas a credencial definitiva nao validou. Nada foi migrado."
+  echo "DB_PREEXISTENTE=sim-recuperado"
+  backup_existing_db
 else
   echo "DB_PREEXISTENTE=nao-ou-credencial-ainda-nao-criada"
   log "Criando banco e usuario pelo CloudPanel"
