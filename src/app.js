@@ -9,6 +9,8 @@ import { r2Status } from './lib/storage.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerPriceTableRoutes } from './routes/price-table.js';
+import { registerTemplateRoutes } from './routes/templates.js';
+import { registerCommerceRoutes } from './routes/commerce.js';
 import { registerSiteHeroRoutes } from './routes/site-hero.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerAdminRoutes } from './routes/admin.js';
@@ -17,6 +19,7 @@ import { registerAdminPrepressRoutes } from './routes/admin-prepress.js';
 import { registerAdminLaunchRoutes } from './routes/admin-launch.js';
 import { registerAdminCatalogRoutes } from './routes/admin-catalog.js';
 import { registerAdminSiteRoutes } from './routes/admin-site.js';
+import { registerAdminAssetRoutes } from './routes/admin-assets.js';
 import { registerMediaRoutes } from './routes/media.js';
 import { registerOrderRoutes } from './routes/orders.js';
 import { registerArtworkRoutes } from './routes/artworks.js';
@@ -64,6 +67,8 @@ export async function buildApp() {
 
   await registerPublicRoutes(app);
   await registerPriceTableRoutes(app);
+  await registerTemplateRoutes(app);
+  await registerCommerceRoutes(app);
   await registerSiteHeroRoutes(app);
   await registerOrderRoutes(app);
   await registerArtworkRoutes(app);
@@ -75,6 +80,7 @@ export async function buildApp() {
   await registerAdminLaunchRoutes(app);
   await registerAdminCatalogRoutes(app);
   await registerAdminSiteRoutes(app);
+  await registerAdminAssetRoutes(app);
   await registerMediaRoutes(app);
 
   app.setErrorHandler((error,request,reply)=>{request.log.error(error);if(error?.message==='DATABASE_NOT_CONFIGURED')return reply.code(503).send({error:'DATABASE_NOT_READY'});if(error?.message==='R2_NOT_CONFIGURED')return reply.code(503).send({error:'R2_NOT_READY'});if(error?.code==='ECONNREFUSED'||error?.code==='ER_ACCESS_DENIED_ERROR'||error?.code==='ER_BAD_DB_ERROR')return reply.code(503).send({error:'DATABASE_NOT_READY'});const statusCode=Number(error?.statusCode||500);return reply.code(statusCode>=400&&statusCode<600?statusCode:500).send({error:statusCode>=500?'INTERNAL_ERROR':(error?.code||'REQUEST_ERROR')})});
