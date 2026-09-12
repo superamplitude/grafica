@@ -29,10 +29,11 @@ function renderGallery(p){
  gallery.addEventListener('click',e=>{const b=e.target.closest('[data-url]');const main=document.querySelector('#mainVisual');if(b&&main)main.src=b.dataset.url;});
 }
 
-function renderTemplates(){
- const templates=(product.templates||[]).filter(t=>t.url);
- if(!templates.length)return;
- document.querySelector('#templatesBox').innerHTML=`<h2>Gabaritos técnicos</h2><p>Use o arquivo compatível com seu editor e confira medidas e sangria antes de preparar a arte.</p><div class="template-links">${templates.map(t=>`<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(String(t.template_type).toUpperCase())} · ${esc(t.side||'geral')}${t.width_mm&&t.height_mm?` · ${esc(t.width_mm)}×${esc(t.height_mm)} mm`:''}</a>`).join('')}</div>`;
+function renderTemplates(templates=[]){
+ const safeTemplates=templates.filter(t=>t.url);
+ const box=document.querySelector('#templatesBox');
+ if(!safeTemplates.length){box.innerHTML='<h2>Gabaritos técnicos</h2><p>Os gabaritos deste produto ainda estão em revisão para garantir arquivos neutros, sem marcas de fornecedores e nas versões corretas.</p>';return;}
+ box.innerHTML=`<h2>Gabaritos técnicos</h2><p>Arquivos revisados e neutros. Escolha a versão compatível com seu editor e confira medidas, corte, segurança e sangria.</p><div class="template-links">${safeTemplates.map(t=>`<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.label||String(t.template_type).toUpperCase())} · ${esc(t.side||'geral')}${t.width_mm&&t.height_mm?` · ${esc(t.width_mm)}×${esc(t.height_mm)} mm`:''}</a>`).join('')}</div>`;
 }
 
 function renderFlags(p){
@@ -66,7 +67,8 @@ async function load(){
  document.querySelector('#categoryName').textContent=p.category_name||'Produto gráfico';
  document.querySelector('#productDescription').textContent=safeText(p.short_description)||'Configure as opções disponíveis para este produto.';
  document.querySelector('#productLongDescription').innerHTML=renderDescription(p.description||p.short_description);
- renderFlags(p);renderGallery(p);renderTemplates();
+ renderFlags(p);renderGallery(p);
+ try{const safe=await api(`/api/v1/products/${encodeURIComponent(slug)}/templates`);renderTemplates(safe.items||[]);}catch{renderTemplates([]);}
  const variants=(product.variants||[]).filter(v=>v.availability!=='unavailable');
  renderVariantMatrix(variants,p);
  variantSelect.innerHTML='<option value="">Selecione uma opção</option>'+variants.map(v=>`<option value="${v.id}">${esc(v.name)}${Number(v.public_price||0)>0?` · ${money.format(Number(v.public_price))}`:''}</option>`).join('');
