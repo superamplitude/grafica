@@ -83,6 +83,8 @@ jobs:
           node-version: '22'
       - run: if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
       - run: npm run migrate && npm run migrate && npm run schema:verify
+      - name: Verify public price table against MySQL
+        run: node src/scripts/verify-price-table.js
 
   mariadb-schema:
     runs-on: ubuntu-latest
@@ -112,3 +114,5 @@ jobs:
           node-version: '22'
       - run: if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
       - run: npm run migrate && npm run migrate && npm run schema:verify
+      - name: Verify public price table against MariaDB
+        run: node src/scripts/verify-price-table.js
