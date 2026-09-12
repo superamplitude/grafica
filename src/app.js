@@ -10,6 +10,7 @@ import { registerAuth } from './plugins/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerAdminRoutes } from './routes/admin.js';
+import { registerMediaRoutes } from './routes/media.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,11 +61,15 @@ export async function buildApp() {
   await registerPublicRoutes(app);
   await registerAuthRoutes(app);
   await registerAdminRoutes(app);
+  await registerMediaRoutes(app);
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error(error);
     if (error?.message === 'DATABASE_NOT_CONFIGURED') {
       return reply.code(503).send({ error: 'DATABASE_NOT_READY' });
+    }
+    if (error?.message === 'R2_NOT_CONFIGURED') {
+      return reply.code(503).send({ error: 'R2_NOT_READY' });
     }
     if (error?.code === 'ECONNREFUSED' || error?.code === 'ER_ACCESS_DENIED_ERROR' || error?.code === 'ER_BAD_DB_ERROR') {
       return reply.code(503).send({ error: 'DATABASE_NOT_READY' });
