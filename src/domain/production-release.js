@@ -36,6 +36,9 @@ export async function releaseReadyOrderItems(connection, {
   const [orderRows] = await connection.execute('SELECT * FROM orders WHERE id=? FOR UPDATE', [orderId]);
   const order = orderRows[0];
   if (!order) return { released: 0, blocked: 'order-not-found', orderStatus: null };
+  if (['cancelled','completed','shipped'].includes(order.status)) {
+    return { released: 0, blocked: 'terminal-order', orderStatus: order.status, paymentStatus: order.payment_status };
+  }
 
   const paymentReady = ['paid', 'not_required'].includes(order.payment_status);
   if (!paymentReady) {
@@ -105,7 +108,7 @@ export async function releaseReadyOrderItems(connection, {
   const coveredCount = Number(coverageRows[0]?.covered_count || 0);
 
   let targetStatus = order.status;
-  if (itemCount > 0 && coveredCount === itemCount && !['shipped', 'completed', 'cancelled'].includes(order.status)) {
+  if (itemCount > 0 && coveredCount === itemCount) {
     targetStatus = 'production';
   } else if (blockedArtwork > 0 && ['paid', 'prepress'].includes(order.status)) {
     targetStatus = 'prepress';
