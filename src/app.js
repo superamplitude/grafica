@@ -11,11 +11,13 @@ import { registerPublicRoutes } from './routes/public.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAdminOrderRoutes } from './routes/admin-orders.js';
+import { registerAdminPrepressRoutes } from './routes/admin-prepress.js';
 import { registerAdminCatalogRoutes } from './routes/admin-catalog.js';
 import { registerAdminSiteRoutes } from './routes/admin-site.js';
 import { registerMediaRoutes } from './routes/media.js';
 import { registerOrderRoutes } from './routes/orders.js';
 import { registerArtworkRoutes } from './routes/artworks.js';
+import { registerProofRoutes } from './routes/proofs.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,9 +62,11 @@ export async function buildApp() {
   await registerPublicRoutes(app);
   await registerOrderRoutes(app);
   await registerArtworkRoutes(app);
+  await registerProofRoutes(app);
   await registerAuthRoutes(app);
   await registerAdminRoutes(app);
   await registerAdminOrderRoutes(app);
+  await registerAdminPrepressRoutes(app);
   await registerAdminCatalogRoutes(app);
   await registerAdminSiteRoutes(app);
   await registerMediaRoutes(app);
