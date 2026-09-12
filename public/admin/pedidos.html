@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pedidos · Super Admin · Central Prints</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/admin/admin-extra.css">
+  <link rel="stylesheet" href="/admin/pedidos.css">
+</head>
+<body class="orders-admin-page">
+  <div class="orders-shell">
+    <header class="orders-topbar">
+      <div>
+        <a class="orders-back" href="/admin/">← Super Admin</a>
+        <h1>Pedidos</h1>
+        <p>Cotação de frete, pagamento e avanço operacional com histórico auditável.</p>
+      </div>
+      <div class="orders-user">
+        <strong id="ordersUserName">Carregando…</strong>
+        <span id="ordersUserRole"></span>
+      </div>
+    </header>
+
+    <section class="orders-filters panel">
+      <form id="ordersFilterForm">
+        <label>Busca
+          <input id="ordersSearch" type="search" placeholder="Pedido, cliente, e-mail ou telefone">
+        </label>
+        <label>Status
+          <select id="ordersStatus"><option value="">Todos</option></select>
+        </label>
+        <label>Pagamento
+          <select id="ordersPaymentStatus"><option value="">Todos</option></select>
+        </label>
+        <button class="action primary" type="submit">Filtrar</button>
+        <button class="action" id="ordersReload" type="button">Atualizar</button>
+      </form>
+      <div id="ordersSummary" class="orders-summary"></div>
+    </section>
+
+    <section class="panel orders-list-panel">
+      <div class="panel-head">
+        <h2>Fila comercial</h2>
+        <span id="ordersMessage">Carregando pedidos…</span>
+      </div>
+      <div class="orders-table-wrap">
+        <table class="table orders-table">
+          <thead>
+            <tr>
+              <th>Pedido</th>
+              <th>Cliente</th>
+              <th>Status</th>
+              <th>Pagamento</th>
+              <th>Total</th>
+              <th>Itens</th>
+              <th>Produção</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ordersRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel order-detail" id="orderDetail" hidden>
+      <div class="panel-head order-detail-head">
+        <div>
+          <span class="order-detail-kicker">Pedido selecionado</span>
+          <h2 id="detailNumber">—</h2>
+          <p id="detailCustomer">—</p>
+        </div>
+        <button class="action" id="closeDetail" type="button">Fechar</button>
+      </div>
+
+      <div class="order-detail-grid">
+        <form id="orderEditForm" class="order-edit-card">
+          <h3>Comercial e financeiro</h3>
+          <div class="order-edit-fields">
+            <label>Status do pedido<select id="detailStatus"></select></label>
+            <label>Status do pagamento<select id="detailPaymentStatus"></select></label>
+            <label>Meio/provedor<input id="detailPaymentProvider" maxlength="80" placeholder="PIX, cartão, manual…"></label>
+            <label>Frete (R$)<input id="detailShipping" type="number" min="0" step="0.01"></label>
+            <label>Desconto (R$)<input id="detailDiscount" type="number" min="0" step="0.01"></label>
+            <label>Valor pago (R$)<input id="detailPaid" type="number" min="0" step="0.01"></label>
+          </div>
+          <label>Observação da alteração<textarea id="detailNote" rows="3" maxlength="5000" placeholder="Motivo, referência ou observação interna"></textarea></label>
+          <div class="order-total-box">
+            <span>Subtotal <strong id="detailSubtotal">R$ 0,00</strong></span>
+            <span>Total atual <strong id="detailGrandTotal">R$ 0,00</strong></span>
+          </div>
+          <button class="action primary" id="saveOrder" type="submit">Salvar alterações</button>
+          <p id="editPermissionNote" class="edit-permission-note"></p>
+        </form>
+
+        <div class="order-info-card">
+          <h3>Entrega e cobrança</h3>
+          <div id="detailAddresses" class="address-grid"></div>
+          <h3>Itens</h3>
+          <div id="detailItems" class="detail-items"></div>
+        </div>
+      </div>
+
+      <div class="order-events-card">
+        <h3>Histórico do pedido</h3>
+        <div id="detailEvents" class="detail-events"></div>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="/admin/pedidos.js"></script>
+</body>
+</html>
