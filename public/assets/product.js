@@ -45,6 +45,17 @@ function renderFlags(p){
  if(!p.requires_artwork)document.querySelector('#artworkNote').innerHTML='<strong>Arte do produto</strong><span>Este produto não exige envio de arte do cliente.</span>';
 }
 
+function renderVariantMatrix(variants,p){
+ const box=document.querySelector('#variantMatrixBox');
+ const rows=document.querySelector('#variantMatrixRows');
+ if(!box||!rows||!variants.length)return;
+ box.hidden=false;
+ const priceLink=document.querySelector('#categoryPriceLink');
+ if(priceLink&&p.category_slug)priceLink.href=`/precos.html?category=${encodeURIComponent(p.category_slug)}`;
+ rows.innerHTML=variants.map(v=>`<tr><td><strong>${esc(v.name)}</strong>${v.external_code||v.sku?`<small>${esc(v.external_code||v.sku)}</small>`:''}</td><td>${v.quantity?esc(v.quantity):'—'}</td><td>${esc(v.size_label||'—')}</td><td>${esc(v.print_configuration||'—')}</td><td>${v.production_days?`${esc(v.production_days)} dia(s)`:'—'}${v.availability==='on_request'?'<small class="matrix-warning">sob consulta</small>':''}</td><td><strong class="matrix-price">${Number(v.public_price||0)>0?money.format(Number(v.public_price)):'Sob consulta'}</strong></td><td><button type="button" class="matrix-select" data-variant-id="${v.id}" ${Number(v.public_price||0)<=0?'disabled':''}>Selecionar</button></td></tr>`).join('');
+ rows.addEventListener('click',e=>{const button=e.target.closest('[data-variant-id]');if(!button)return;variantSelect.value=button.dataset.variantId;variantSelect.dispatchEvent(new Event('change'));document.querySelector('.config-panel')?.scrollIntoView({behavior:'smooth',block:'start'});});
+}
+
 async function load(){
  if(!slug){document.querySelector('#productName').textContent='Produto não informado';variantSelect.innerHTML='<option>Sem produto</option>';return;}
  try{product=await api(`/api/v1/configurator/${encodeURIComponent(slug)}`);}catch{document.querySelector('#productName').textContent='Produto indisponível';document.querySelector('#productDescription').textContent='Este produto não está publicado ou foi removido do catálogo.';variantSelect.innerHTML='<option>Sem opções</option>';return;}
@@ -57,6 +68,7 @@ async function load(){
  document.querySelector('#productLongDescription').innerHTML=renderDescription(p.description||p.short_description);
  renderFlags(p);renderGallery(p);renderTemplates();
  const variants=(product.variants||[]).filter(v=>v.availability!=='unavailable');
+ renderVariantMatrix(variants,p);
  variantSelect.innerHTML='<option value="">Selecione uma opção</option>'+variants.map(v=>`<option value="${v.id}">${esc(v.name)}${Number(v.public_price||0)>0?` · ${money.format(Number(v.public_price))}`:''}</option>`).join('');
  if(!variants.length){variantSelect.innerHTML='<option value="">Nenhuma opção publicada</option>';variantSelect.disabled=true;detail.textContent='Este produto ainda não possui uma variante disponível para compra.';}
 }
