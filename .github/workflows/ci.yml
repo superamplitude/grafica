@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install dependencies
+      - name: Install dependencies and build lockfile
         run: npm install --omit=dev
 
       - name: Static and runtime verification
@@ -30,3 +30,12 @@ jobs:
 
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
+
+      - name: Export package lock
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 3
