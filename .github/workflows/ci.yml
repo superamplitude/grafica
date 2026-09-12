@@ -1,0 +1,32 @@
+name: Central Prints CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --omit=dev
+
+      - name: Static and runtime verification
+        run: npm run verify
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
