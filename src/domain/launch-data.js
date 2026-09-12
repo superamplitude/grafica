@@ -44,8 +44,18 @@ export async function productRows(connection, ids = null) {
            (SELECT COUNT(*) FROM product_variants v WHERE v.product_id=p.id AND v.status='active') AS variant_count,
            (SELECT COUNT(*) FROM product_variants v WHERE v.product_id=p.id AND v.status='active' AND v.availability<>'unavailable' AND v.public_price>0) AS priced_variant_count,
            (SELECT MIN(NULLIF(v.public_price,0)) FROM product_variants v WHERE v.product_id=p.id AND v.status='active' AND v.availability<>'unavailable' AND v.public_price>0) AS starting_price,
-           (SELECT COUNT(*) FROM product_media pm JOIN media_objects m ON m.id=pm.media_id WHERE pm.product_id=p.id AND pm.role='cover' AND m.visibility='public') AS cover_count,
-           (SELECT COUNT(*) FROM product_templates pt JOIN media_objects m ON m.id=pt.media_id WHERE pt.product_id=p.id AND pt.status='active' AND m.visibility='public') AS template_count,
+           (SELECT COUNT(*)
+              FROM product_media pm
+              JOIN media_objects m ON m.id=pm.media_id AND m.visibility='public'
+              JOIN media_asset_reviews r ON r.media_id=m.id
+               AND r.usage_type='product' AND r.photo_type='real' AND r.supplier_branding='clear'
+               AND r.license_status IN ('owned','licensed') AND r.review_status='approved'
+             WHERE pm.product_id=p.id AND pm.role='cover') AS cover_count,
+           (SELECT COUNT(*)
+              FROM product_templates pt
+              LEFT JOIN media_objects m ON m.id=pt.media_id AND m.visibility='public' AND m.kind='template'
+             WHERE pt.product_id=p.id AND pt.status='active' AND pt.brand_neutral=1 AND pt.verified_at IS NOT NULL
+               AND ((pt.media_id IS NOT NULL AND m.id IS NOT NULL) OR (pt.template_type='canva' AND pt.external_url LIKE 'https://%'))) AS template_count,
            (SELECT COUNT(*) FROM product_variants v WHERE v.product_id=p.id AND v.status='active' AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(v.production_json,'$.production_mode')),JSON_UNQUOTE(JSON_EXTRACT(v.production_json,'$.mode'))) IN ('outsourced','hybrid')) AS outsourced_variant_count
       FROM products p
       LEFT JOIN categories c ON c.id=p.category_id
@@ -59,8 +69,22 @@ export async function productRows(connection, ids = null) {
 export async function launchSnapshot(connection) {
   const rows = await productRows(connection);
   const evaluated = rows.map((row) => ({ row, readiness: evaluateProductReadiness(row), repairs: repairSuggestions(row) }));
-  const [heroRows] = await connection.query(`SELECT COUNT(*) AS n FROM banners WHERE placement='home-hero' AND status='active' AND (starts_at IS NULL OR starts_at<=NOW()) AND (ends_at IS NULL OR ends_at>=NOW())`);
+  const [heroRows] = await connection.query(`
+    SELECT COUNT(*) AS n
+      FROM banners b
+      JOIN media_objects dm ON dm.id=b.desktop_media_id AND dm.visibility='public' AND dm.kind='banner'
+      JOIN media_asset_reviews rd ON rd.media_id=dm.id AND rd.usage_type='hero' AND rd.review_status='approved'
+       AND rd.supplier_branding='clear' AND rd.price_text='clear' AND rd.license_status IN ('owned','licensed')
+     WHERE b.placement='home-hero' AND b.status='active'
+       AND (b.starts_at IS NULL OR b.starts_at<=NOW()) AND (b.ends_at IS NULL OR b.ends_at>=NOW())
+  `);
   const [supplierRows] = await connection.query(`SELECT COUNT(*) total,SUM(status='approved') approved,SUM(status IN ('inactive','suspended')) blocked FROM suppliers`);
+  const [commerceRows] = await connection.query(`
+    SELECT integration_type,COUNT(*) AS n FROM commerce_integrations
+     WHERE status='active' AND adapter_status='verified' AND verified_at IS NOT NULL
+     GROUP BY integration_type
+  `);
+  const commerce = Object.fromEntries(commerceRows.map((row)=>[row.integration_type,Number(row.n||0)]));
   const attestations = await readAttestations(connection);
   const metrics = {
     products_total: evaluated.length,
@@ -69,6 +93,8 @@ export async function launchSnapshot(connection) {
     pilot_candidates: evaluated.filter((item) => item.readiness.complete && ['draft','paused'].includes(item.row.status)).length,
     repairable_products: evaluated.filter((item) => item.repairs.length > 0).length,
     active_hero_banners: Number(heroRows[0]?.n || 0),
+    active_payment_integrations: commerce.payment || 0,
+    active_shipping_integrations: commerce.shipping || 0,
     suppliers_total: Number(supplierRows[0]?.total || 0),
     suppliers_approved: Number(supplierRows[0]?.approved || 0),
     suppliers_blocked: Number(supplierRows[0]?.blocked || 0)
