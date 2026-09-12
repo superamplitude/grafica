@@ -1,0 +1,82 @@
+name: Central Prints VPS
+
+on:
+  workflow_run:
+    workflows: ["Central Prints CI"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Acao restrita na VPS"
+        required: true
+        default: "diagnostics"
+        type: choice
+        options:
+          - diagnostics
+          - deploy
+
+concurrency:
+  group: central-prints-vps
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  vps:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       vars.VPS_DEPLOY_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VPS_HOST: ${{ secrets.CENTRAL_PRINTS_VPS_HOST }}
+      VPS_PORT: ${{ secrets.CENTRAL_PRINTS_VPS_PORT }}
+      VPS_USER: ${{ secrets.CENTRAL_PRINTS_VPS_USER }}
+      VPS_DEPLOY_KEY: ${{ secrets.CENTRAL_PRINTS_VPS_DEPLOY_KEY }}
+      VPS_KNOWN_HOSTS: ${{ secrets.CENTRAL_PRINTS_VPS_KNOWN_HOSTS }}
+    steps:
+      - name: Validate VPS secrets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [ -n "$VPS_HOST" ] || { echo "CENTRAL_PRINTS_VPS_HOST ausente" >&2; exit 2; }
+          [ -n "$VPS_DEPLOY_KEY" ] || { echo "CENTRAL_PRINTS_VPS_DEPLOY_KEY ausente" >&2; exit 2; }
+          [ -n "$VPS_KNOWN_HOSTS" ] || { echo "CENTRAL_PRINTS_VPS_KNOWN_HOSTS ausente" >&2; exit 2; }
+
+      - name: Configure restricted SSH client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_DEPLOY_KEY" > "$HOME/.ssh/central_prints_actions"
+          chmod 600 "$HOME/.ssh/central_prints_actions"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Run restricted VPS action
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PORT="${VPS_PORT:-22}"
+          USER="${VPS_USER:-root}"
+          ACTION="deploy"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            case "${{ inputs.action }}" in
+              deploy) ACTION="deploy" ;;
+              diagnostics) ACTION="diagnostics" ;;
+              *) echo "Acao invalida" >&2; exit 2 ;;
+            esac
+          fi
+          REMOTE="central-prints-$ACTION"
+          echo "Executando acao restrita: $REMOTE"
+          ssh \
+            -i "$HOME/.ssh/central_prints_actions" \
+            -p "$PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$USER@$VPS_HOST" "$REMOTE"
