@@ -3,7 +3,8 @@ set -Eeuo pipefail
 
 APP_DIR="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
 DOMAIN="grafica.belastock.com.br"
-APP_PORT="3005"
+APP_PORT_DEFAULT="3005"
+APP_PORT="$APP_PORT_DEFAULT"
 BACKUP_ROOT="/home/belastock-grafica/backups"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="$BACKUP_ROOT/site_deploy_$STAMP"
@@ -21,7 +22,12 @@ chmod 700 "$BACKUP_DIR"
 cd "$APP_DIR"
 
 PREVIOUS="$(git_safe rev-parse HEAD)"
+PREVIOUS_HAS_PREFLIGHT=0
+if [ -f ecosystem.config.cjs ] && grep -q "central-prints-preflight" ecosystem.config.cjs; then
+  PREVIOUS_HAS_PREFLIGHT=1
+fi
 printf '%s\n' "$PREVIOUS" > "$BACKUP_DIR/git-head.before.txt"
+printf '%s\n' "$PREVIOUS_HAS_PREFLIGHT" > "$BACKUP_DIR/preflight.before.txt"
 [ -f .env ] && cp -a .env "$BACKUP_DIR/env.before" && chmod 600 "$BACKUP_DIR/env.before" || true
 printf '%s\n' "$PREVIOUS" > .last-good-commit
 
@@ -32,6 +38,9 @@ rollback(){
   git_safe reset --hard "$PREVIOUS" || true
   if [ -f package-lock.json ]; then npm ci --omit=dev || true; else npm install --omit=dev || true; fi
   pm2 startOrReload ecosystem.config.cjs --update-env || true
+  if [ "$PREVIOUS_HAS_PREFLIGHT" -eq 0 ]; then
+    pm2 delete central-prints-preflight >/dev/null 2>&1 || true
+  fi
   pm2 save || true
   echo "[ROLLBACK] Aplicacao restaurada. Evidencias em $BACKUP_DIR" >&2
   exit "$rc"
@@ -51,11 +60,18 @@ else
   npm install --omit=dev
 fi
 
-log "Executando verificacao completa antes do restart"
+APP_PORT="$(node --input-type=module -e "import 'dotenv/config'; const p=Number(process.env.PORT||${APP_PORT_DEFAULT}); if(!Number.isInteger(p)||p<1||p>65535) process.exit(2); process.stdout.write(String(p));")"
+printf '%s\n' "$APP_PORT" > "$BACKUP_DIR/app-port.txt"
+log "Porta local detectada: $APP_PORT"
+
+log "Executando verificacao de codigo antes de alterar o banco"
 npm run verify
+
+log "Aplicando migracoes idempotentes e validando schema"
+npm run migrate
 npm run schema:verify
 
-log "Reiniciando Central Prints no App Port CloudPanel $APP_PORT"
+log "Reiniciando Central Prints na porta local $APP_PORT"
 pm2 startOrReload ecosystem.config.cjs --update-env
 
 HEALTH="000"; READY="000"; ROOT="000"; CATALOG="000"
@@ -68,14 +84,15 @@ for _ in $(seq 1 25); do
   sleep 1
 done
 
+echo "LOCAL_PORT=$APP_PORT"
 echo "LOCAL_HEALTH_HTTP=$HEALTH"
 echo "LOCAL_READY_HTTP=$READY"
 echo "LOCAL_HOME_HTTP=$ROOT"
 echo "LOCAL_CATALOG_HTTP=$CATALOG"
-[ "$HEALTH" = "200" ] || fail "Health local falhou: $HEALTH"
-[ "$READY" = "200" ] || fail "Readiness local falhou: $READY"
-[ "$ROOT" = "200" ] || fail "Home local falhou: $ROOT"
-[ "$CATALOG" = "200" ] || fail "Catalogo local falhou: $CATALOG"
+[ "$HEALTH" = "200" ] || fail "Health local falhou na porta $APP_PORT: $HEALTH"
+[ "$READY" = "200" ] || fail "Readiness local falhou na porta $APP_PORT: $READY"
+[ "$ROOT" = "200" ] || fail "Home local falhou na porta $APP_PORT: $ROOT"
+[ "$CATALOG" = "200" ] || fail "Catalogo local falhou na porta $APP_PORT: $CATALOG"
 
 grep -qi 'Central Prints' "$BACKUP_DIR/home.html" || fail "Home respondeu 200 sem identidade Central Prints."
 grep -qi 'Catálogo Central Prints' "$BACKUP_DIR/catalogo.html" || fail "Catalogo respondeu 200 sem o conteudo esperado."
@@ -103,10 +120,13 @@ echo "============================================================"
 echo " CENTRAL PRINTS SITE DEPLOYED"
 echo "============================================================"
 echo "COMMIT=$(git_safe rev-parse --short HEAD)"
+echo "LOCAL_PORT=$APP_PORT"
 echo "HOME=https://$DOMAIN/"
 echo "CATALOGO=https://$DOMAIN/catalogo.html"
 echo "ADMIN=https://$DOMAIN/admin/"
 echo "EDITOR=https://$DOMAIN/admin/catalogo.html"
+echo "PEDIDOS=https://$DOMAIN/admin/pedidos.html"
+echo "PREPRESS=https://$DOMAIN/admin/prepress.html"
 echo "HEALTH_HTTP=$HEALTH"
 echo "READY_HTTP=$READY"
 echo "PUBLIC_HTTP=$PUBLIC"
