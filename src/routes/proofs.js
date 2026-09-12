@@ -26,7 +26,7 @@ export async function registerProofRoutes(app) {
         LEFT JOIN products p ON p.id=oi.product_id
         LEFT JOIN product_variants pv ON pv.id=oi.variant_id
         JOIN media_objects mo ON mo.id=pr.media_id
-       WHERE oi.order_id=?
+       WHERE oi.order_id=? AND a.superseded_at IS NULL
        ORDER BY a.order_item_id,pr.version_no DESC,pr.id DESC
     `, [order.id]);
 
@@ -65,7 +65,7 @@ export async function registerProofRoutes(app) {
     try {
       await connection.beginTransaction();
       const [rows] = await connection.execute(`
-        SELECT pr.*,a.order_item_id,oi.order_id,o.payment_status,o.customer_id
+        SELECT pr.*,a.order_item_id,a.superseded_at,oi.order_id,o.payment_status,o.customer_id
           FROM proofs pr
           JOIN artworks a ON a.id=pr.artwork_id
           JOIN order_items oi ON oi.id=a.order_item_id
@@ -76,6 +76,10 @@ export async function registerProofRoutes(app) {
       if (!proof || Number(proof.order_id) !== Number(accessibleOrder.id)) {
         await connection.rollback();
         return reply.code(404).send({ error:'PROOF_NOT_FOUND' });
+      }
+      if (proof.superseded_at) {
+        await connection.rollback();
+        return reply.code(409).send({ error:'PROOF_SUPERSEDED' });
       }
       if (proof.status !== 'pending') {
         await connection.rollback();
@@ -92,7 +96,7 @@ export async function registerProofRoutes(app) {
 
       let release = null;
       if (approved) {
-        const [pendingRows] = await connection.execute(`SELECT COUNT(*) AS pending FROM artworks WHERE order_item_id=? AND status<>'approved'`, [proof.order_item_id]);
+        const [pendingRows] = await connection.execute(`SELECT COUNT(*) AS pending FROM artworks WHERE order_item_id=? AND superseded_at IS NULL AND status<>'approved'`, [proof.order_item_id]);
         const pending = Number(pendingRows[0]?.pending || 0);
         if (pending === 0) {
           const itemStatus = ['paid','not_required'].includes(proof.payment_status) ? 'ready-for-production' : 'artwork-approved-awaiting-payment';
