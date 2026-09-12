@@ -10,6 +10,7 @@ import { registerAuth } from './plugins/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerAdminRoutes } from './routes/admin.js';
+import { registerAdminOrderRoutes } from './routes/admin-orders.js';
 import { registerAdminCatalogRoutes } from './routes/admin-catalog.js';
 import { registerAdminSiteRoutes } from './routes/admin-site.js';
 import { registerMediaRoutes } from './routes/media.js';
@@ -61,6 +62,7 @@ export async function buildApp() {
   await registerArtworkRoutes(app);
   await registerAuthRoutes(app);
   await registerAdminRoutes(app);
+  await registerAdminOrderRoutes(app);
   await registerAdminCatalogRoutes(app);
   await registerAdminSiteRoutes(app);
   await registerMediaRoutes(app);

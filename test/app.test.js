@@ -22,7 +22,8 @@ for (const [url, marker] of [
   ['/pedido.html', /Acompanhe sua solicitação/i],
   ['/admin/', /Super Admin/i],
   ['/admin/catalogo.html', /Editor de Catálogo/i],
-  ['/admin/site.html', /Editor do Site/i]
+  ['/admin/site.html', /Editor do Site/i],
+  ['/admin/pedidos.html', /Pedidos/i]
 ]) {
   test(`GET ${url} serves essential site page`, async () => {
     const response = await app.inject({ method: 'GET', url });
