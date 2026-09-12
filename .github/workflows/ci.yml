@@ -6,8 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: central-prints-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -18,12 +22,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies and build lockfile
-        run: npm install --omit=dev
+      - name: Install exact dependencies or generate lockfile
+        run: |
+          if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
       - name: Static and runtime verification
         run: npm run verify
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
+      - name: Commit reproducible package lock
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name 'central-prints-ci'
+          git config user.email 'actions@users.noreply.github.com'
+          git add package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: lock verified production dependencies [skip ci]'
+            git push origin HEAD:main
+          fi
       - name: Export package lock
         if: success()
         uses: actions/upload-artifact@v4
@@ -44,8 +59,7 @@ jobs:
           MYSQL_DATABASE: central_prints
           MYSQL_USER: central_prints
           MYSQL_PASSWORD: testpass
-        ports:
-          - 3306:3306
+        ports: ['3306:3306']
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -prootpass"
           --health-interval=5s --health-timeout=5s --health-retries=20
@@ -60,9 +74,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --omit=dev
-      - name: Apply migrations twice and verify integrity
-        run: npm run migrate && npm run migrate && npm run schema:verify
+      - run: if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
+      - run: npm run migrate && npm run migrate && npm run schema:verify
 
   mariadb-schema:
     runs-on: ubuntu-latest
@@ -75,8 +88,7 @@ jobs:
           MARIADB_DATABASE: central_prints
           MARIADB_USER: central_prints
           MARIADB_PASSWORD: testpass
-        ports:
-          - 3306:3306
+        ports: ['3306:3306']
         options: >-
           --health-cmd="healthcheck.sh --connect --innodb_initialized"
           --health-interval=5s --health-timeout=5s --health-retries=20
@@ -91,6 +103,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --omit=dev
-      - name: Apply migrations twice and verify integrity
-        run: npm run migrate && npm run migrate && npm run schema:verify
+      - run: if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
+      - run: npm run migrate && npm run migrate && npm run schema:verify
