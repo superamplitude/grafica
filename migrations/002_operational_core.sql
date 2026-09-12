@@ -1,29 +1,28 @@
-ALTER TABLE suppliers
-  ADD COLUMN IF NOT EXISTS login_url VARCHAR(500) NULL AFTER website_url,
-  ADD COLUMN IF NOT EXISTS price_table_url VARCHAR(500) NULL AFTER catalog_url,
-  ADD COLUMN IF NOT EXISTS integration_url VARCHAR(500) NULL AFTER price_table_url,
-  ADD COLUMN IF NOT EXISTS catalog_source_type VARCHAR(40) NULL AFTER integration_type,
-  ADD COLUMN IF NOT EXISTS direct_shipping_mode ENUM('unknown','confirmed','unsupported') NOT NULL DEFAULT 'unknown' AFTER fulfillment_direct,
-  ADD COLUMN IF NOT EXISTS white_label_status ENUM('unknown','confirmed','unsupported') NOT NULL DEFAULT 'unknown' AFTER neutral_packaging,
-  ADD COLUMN IF NOT EXISTS sync_mode ENUM('manual','assisted','api') NOT NULL DEFAULT 'manual' AFTER is_primary,
-  ADD COLUMN IF NOT EXISTS last_sync_at DATETIME NULL AFTER sync_mode;
+SET @db := DATABASE();
 
-ALTER TABLE products
-  ADD COLUMN IF NOT EXISTS featured TINYINT(1) NOT NULL DEFAULT 0 AFTER status,
-  ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 0 AFTER featured;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='suppliers' AND COLUMN_NAME='login_url')=0,'ALTER TABLE suppliers ADD COLUMN login_url VARCHAR(500) NULL AFTER website_url','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='suppliers' AND COLUMN_NAME='price_table_url')=0,'ALTER TABLE suppliers ADD COLUMN price_table_url VARCHAR(500) NULL AFTER catalog_url','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='suppliers' AND COLUMN_NAME='integration_url')=0,'ALTER TABLE suppliers ADD COLUMN integration_url VARCHAR(500) NULL AFTER price_table_url','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='suppliers' AND COLUMN_NAME='catalog_source_type')=0,'ALTER TABLE suppliers ADD COLUMN catalog_source_type VARCHAR(40) NULL AFTER integration_type','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='suppliers' AND COLUMN_NAME='direct_shipping_mode')=0,'ALTER TABLE suppliers ADD COLUMN direct_shipping_mode ENUM(''unknown'',''confirmed'',''unsupported'') NOT NULL DEFAULT ''unknown'' AFTER fulfillment_direct','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='suppliers' AND COLUMN_NAME='white_label_status')=0,'ALTER TABLE suppliers ADD COLUMN white_label_status ENUM(''unknown'',''confirmed'',''unsupported'') NOT NULL DEFAULT ''unknown'' AFTER neutral_packaging','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='suppliers' AND COLUMN_NAME='sync_mode')=0,'ALTER TABLE suppliers ADD COLUMN sync_mode ENUM(''manual'',''assisted'',''api'') NOT NULL DEFAULT ''manual'' AFTER is_primary','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='suppliers' AND COLUMN_NAME='last_sync_at')=0,'ALTER TABLE suppliers ADD COLUMN last_sync_at DATETIME NULL AFTER sync_mode','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
 
-ALTER TABLE product_variants
-  ADD COLUMN IF NOT EXISTS external_code VARCHAR(120) NULL AFTER sku,
-  ADD COLUMN IF NOT EXISTS supplier_cost DECIMAL(14,4) NOT NULL DEFAULT 0 AFTER price,
-  ADD COLUMN IF NOT EXISTS additional_cost DECIMAL(14,4) NOT NULL DEFAULT 0 AFTER supplier_cost,
-  ADD COLUMN IF NOT EXISTS public_price DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER additional_cost,
-  ADD COLUMN IF NOT EXISTS reseller_price DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER public_price,
-  ADD COLUMN IF NOT EXISTS quantity DECIMAL(14,3) NOT NULL DEFAULT 1 AFTER reseller_price,
-  ADD COLUMN IF NOT EXISTS size_label VARCHAR(120) NULL AFTER quantity,
-  ADD COLUMN IF NOT EXISTS print_configuration VARCHAR(40) NULL AFTER size_label,
-  ADD COLUMN IF NOT EXISTS production_days INT UNSIGNED NULL AFTER print_configuration,
-  ADD COLUMN IF NOT EXISTS availability ENUM('available','unavailable','on_request') NOT NULL DEFAULT 'available' AFTER production_days,
-  ADD UNIQUE KEY IF NOT EXISTS uq_variant_external_code (external_code);
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='products' AND COLUMN_NAME='featured')=0,'ALTER TABLE products ADD COLUMN featured TINYINT(1) NOT NULL DEFAULT 0 AFTER status','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='products' AND COLUMN_NAME='sort_order')=0,'ALTER TABLE products ADD COLUMN sort_order INT NOT NULL DEFAULT 0 AFTER featured','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND COLUMN_NAME='external_code')=0,'ALTER TABLE product_variants ADD COLUMN external_code VARCHAR(120) NULL AFTER sku','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND COLUMN_NAME='supplier_cost')=0,'ALTER TABLE product_variants ADD COLUMN supplier_cost DECIMAL(14,4) NOT NULL DEFAULT 0 AFTER price','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND COLUMN_NAME='additional_cost')=0,'ALTER TABLE product_variants ADD COLUMN additional_cost DECIMAL(14,4) NOT NULL DEFAULT 0 AFTER supplier_cost','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND COLUMN_NAME='public_price')=0,'ALTER TABLE product_variants ADD COLUMN public_price DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER additional_cost','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND COLUMN_NAME='reseller_price')=0,'ALTER TABLE product_variants ADD COLUMN reseller_price DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER public_price','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND COLUMN_NAME='quantity')=0,'ALTER TABLE product_variants ADD COLUMN quantity DECIMAL(14,3) NOT NULL DEFAULT 1 AFTER reseller_price','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND COLUMN_NAME='size_label')=0,'ALTER TABLE product_variants ADD COLUMN size_label VARCHAR(120) NULL AFTER quantity','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND COLUMN_NAME='print_configuration')=0,'ALTER TABLE product_variants ADD COLUMN print_configuration VARCHAR(40) NULL AFTER size_label','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND COLUMN_NAME='production_days')=0,'ALTER TABLE product_variants ADD COLUMN production_days INT UNSIGNED NULL AFTER print_configuration','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND COLUMN_NAME='availability')=0,'ALTER TABLE product_variants ADD COLUMN availability ENUM(''available'',''unavailable'',''on_request'') NOT NULL DEFAULT ''available'' AFTER production_days','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
+SET @ddl := IF((SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='product_variants' AND INDEX_NAME='uq_variant_external_code')=0,'ALTER TABLE product_variants ADD UNIQUE KEY uq_variant_external_code (external_code)','SELECT 1'); PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
 
 CREATE TABLE IF NOT EXISTS product_media (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
