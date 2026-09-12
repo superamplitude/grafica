@@ -39,6 +39,9 @@ export async function releaseReadyOrderItems(connection, {
   if (['cancelled','completed','shipped'].includes(order.status)) {
     return { released: 0, blocked: 'terminal-order', orderStatus: order.status, paymentStatus: order.payment_status };
   }
+  if (order.status === 'awaiting-shipping-quote') {
+    return { released: 0, blocked: 'shipping', orderStatus: order.status, paymentStatus: order.payment_status };
+  }
 
   const paymentReady = ['paid', 'not_required'].includes(order.payment_status);
   if (!paymentReady) {
