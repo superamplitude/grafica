@@ -20,7 +20,8 @@ async function itemArtworkState(connection, item) {
   const [rows] = await connection.execute(`
     SELECT COUNT(*) AS total,
            SUM(CASE WHEN status='approved' THEN 0 ELSE 1 END) AS pending
-      FROM artworks WHERE order_item_id=?
+      FROM artworks
+     WHERE order_item_id=? AND superseded_at IS NULL
   `, [item.id]);
   const total = Number(rows[0]?.total || 0);
   const pending = Number(rows[0]?.pending || 0);
