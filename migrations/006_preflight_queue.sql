@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS preflight_jobs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  artwork_id BIGINT UNSIGNED NOT NULL UNIQUE,
+  status ENUM('queued','running','completed','failed') NOT NULL DEFAULT 'queued',
+  attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  available_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  locked_at DATETIME NULL,
+  last_error TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_preflight_queue (status,available_at,id),
+  CONSTRAINT fk_preflight_artwork FOREIGN KEY (artwork_id) REFERENCES artworks(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
