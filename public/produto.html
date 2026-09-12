@@ -1,4 +1,43 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Configurar produto · Central Prints</title><link rel="stylesheet" href="/assets/portal.css"><link rel="stylesheet" href="/assets/product.css"></head>
-<body><div class="topbar"><div class="container topbar-inner"><a href="/">← Voltar para a loja</a><span>Configuração segura</span></div></div><header class="header"><div class="container product-header"><a class="brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a><a class="cart-link" href="/checkout.html">Carrinho <b id="cartCount">0</b></a></div></header>
-<main class="container product-layout"><section><div class="product-gallery" id="gallery"><div class="image-placeholder"></div></div><div class="templates-box" id="templatesBox"><h2>Gabaritos</h2><p>Os arquivos técnicos disponíveis para este produto aparecerão aqui.</p></div></section><section class="config-panel"><span class="eyebrow" id="categoryName">Produto gráfico</span><h1 id="productName">Carregando…</h1><p id="productDescription"></p><form id="configForm"><label>Opção / quantidade<select id="variantSelect" required><option value="">Carregando opções…</option></select></label><div class="variant-detail" id="variantDetail"></div><label id="frontLabel"><input type="checkbox" id="frontArtwork" checked disabled> Arte frente</label><label id="backLabel" hidden><input type="checkbox" id="backArtwork" checked disabled> Arte verso</label><label>Observações<textarea id="notes" maxlength="1000" placeholder="Informações importantes para a produção"></textarea></label><div class="config-total"><span>Total deste item</span><strong id="itemPrice">—</strong></div><button class="btn primary full" type="submit">Adicionar ao carrinho</button></form><div class="safe-note">O preço é validado novamente no servidor ao fechar o pedido. Custos internos e valores de fornecedores nunca são enviados ao navegador.</div></section></main><script type="module" src="/assets/product.js"></script></body></html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Configurar produto · Central Prints</title>
+  <meta name="description" content="Configure seu produto gráfico na Central Prints.">
+  <link rel="stylesheet" href="/assets/portal.css">
+  <link rel="stylesheet" href="/assets/product.css">
+</head>
+<body>
+  <div class="topbar"><div class="container topbar-inner"><a href="/catalogo.html">← Voltar ao catálogo</a><span>Configuração segura</span></div></div>
+  <header class="header"><div class="container product-header"><a class="brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a><nav class="product-mini-nav"><a href="/pedido.html">Pedidos</a><a class="cart-link" href="/checkout.html">Carrinho <b id="cartCount">0</b></a></nav></div></header>
+  <main>
+    <div class="container product-breadcrumb"><a href="/">Início</a><span>›</span><a href="/catalogo.html">Catálogo</a><span>›</span><strong id="breadcrumbName">Produto</strong></div>
+    <div class="container product-layout">
+      <section>
+        <div class="product-gallery" id="gallery"><div class="product-placeholder"><span>CP</span><small>Imagem comercial em preparação</small></div></div>
+        <div class="product-info-card"><span class="eyebrow">Sobre este produto</span><h2>Informações</h2><div id="productLongDescription" class="rich-description">As informações detalhadas deste produto aparecerão aqui.</div></div>
+        <div class="templates-box" id="templatesBox"><h2>Gabaritos técnicos</h2><p>Quando houver um gabarito homologado para este produto, ele ficará disponível aqui. Arquivo técnico e imagem comercial são tratados separadamente.</p></div>
+      </section>
+      <section class="config-panel">
+        <span class="eyebrow" id="categoryName">Produto gráfico</span>
+        <h1 id="productName">Carregando…</h1>
+        <p id="productDescription"></p>
+        <div class="product-flags" id="productFlags"></div>
+        <form id="configForm">
+          <label>Opção / quantidade<select id="variantSelect" required><option value="">Carregando opções…</option></select></label>
+          <div class="variant-detail" id="variantDetail">Selecione uma opção para ver medidas, impressão e prazo.</div>
+          <div class="artwork-note" id="artworkNote"><strong>Arte do produto</strong><span>Quando exigida, a arte será vinculada ao pedido antes da liberação para produção.</span></div>
+          <label>Observações<textarea id="notes" maxlength="1000" placeholder="Informações importantes para a produção"></textarea></label>
+          <div class="config-total"><span>Total deste item</span><strong id="itemPrice">—</strong></div>
+          <button class="btn primary full" id="addToCart" type="submit" disabled>Adicionar ao carrinho</button>
+          <div class="form-feedback" id="formFeedback" aria-live="polite"></div>
+        </form>
+        <div class="safe-note">O preço é validado novamente no servidor ao registrar o pedido. Custos internos e valores de fornecedores não são enviados ao navegador.</div>
+      </section>
+    </div>
+  </main>
+  <footer><div class="container footer-grid compact-footer"><div><a class="brand footer-brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a><p>Configuração, arte e produção dentro do mesmo fluxo.</p></div><div><h3>Catálogo</h3><a href="/catalogo.html">Todos os produtos</a></div><div><h3>Pedidos</h3><a href="/pedido.html">Acompanhar pedido</a></div><div><h3>Central Prints</h3><a href="/#atendimento">Atendimento</a></div></div></footer>
+  <script type="module" src="/assets/product.js"></script>
+</body>
+</html>
