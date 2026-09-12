@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getDb } from '../lib/db.js';
+import { publicObjectUrl } from '../lib/storage.js';
 
 const reviewSchema = z.object({
   usage_type: z.enum(['product','hero','template','other']),
@@ -35,6 +36,27 @@ export async function registerAdminAssetRoutes(app) {
   const staff = app.requireRole('super_admin','admin','operations','prepress','support');
   const reviewers = app.requireRole('super_admin','admin','prepress');
 
+  app.get('/api/v1/admin/assets/candidates', { preHandler: staff }, async (request) => {
+    const db = getDb();
+    const kind = String(request.query?.kind || '').trim();
+    const reviewStatus = String(request.query?.status || '').trim();
+    const where = ["m.visibility='public'", "m.kind IN ('product-photo','banner','template')"];
+    const params = [];
+    if (['product-photo','banner','template'].includes(kind)) { where.push('m.kind=?'); params.push(kind); }
+    if (reviewStatus === 'unreviewed') where.push('r.id IS NULL');
+    if (['pending','approved','rejected'].includes(reviewStatus)) { where.push('r.review_status=?'); params.push(reviewStatus); }
+    const [rows] = await db.execute(`
+      SELECT m.id,m.kind,m.object_key,m.original_name,m.mime_type,m.size_bytes,m.created_at,
+             r.usage_type,r.photo_type,r.supplier_branding,r.price_text,r.license_status,r.review_status,r.notes,r.reviewed_at
+        FROM media_objects m
+        LEFT JOIN media_asset_reviews r ON r.media_id=m.id
+       WHERE ${where.join(' AND ')}
+       ORDER BY COALESCE(r.reviewed_at,m.created_at) DESC,m.id DESC
+       LIMIT 500
+    `, params);
+    return { items:rows.map((row)=>({ ...row, url:publicObjectUrl(row.object_key), review_status:row.review_status||'unreviewed' })) };
+  });
+
   app.get('/api/v1/admin/assets/reviews', { preHandler: staff }, async (request) => {
     const db = getDb();
     const usage = String(request.query?.usage || '').trim();
@@ -53,7 +75,7 @@ export async function registerAdminAssetRoutes(app) {
        ORDER BY r.updated_at DESC,r.id DESC
        LIMIT 500
     `, params);
-    return { items: rows };
+    return { items: rows.map((row)=>({ ...row, url:publicObjectUrl(row.object_key) })) };
   });
 
   app.get('/api/v1/admin/media/:id/review', { preHandler: staff }, async (request, reply) => {
@@ -63,7 +85,7 @@ export async function registerAdminAssetRoutes(app) {
     const [mediaRows] = await db.execute('SELECT id,kind,visibility,object_key,original_name,mime_type,size_bytes,metadata_json,created_at FROM media_objects WHERE id=? LIMIT 1', [mediaId]);
     if (!mediaRows[0]) return reply.code(404).send({ error:'MEDIA_NOT_FOUND' });
     const [reviewRows] = await db.execute('SELECT * FROM media_asset_reviews WHERE media_id=? LIMIT 1', [mediaId]);
-    return { media: mediaRows[0], review: reviewRows[0] || null };
+    return { media:{...mediaRows[0],url:publicObjectUrl(mediaRows[0].object_key)}, review: reviewRows[0] || null };
   });
 
   app.put('/api/v1/admin/media/:id/review', { preHandler: reviewers }, async (request, reply) => {
