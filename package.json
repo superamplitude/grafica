@@ -9,7 +9,8 @@
     "dev": "node --watch src/server.js",
     "check": "node --check src/server.js && node --check src/app.js && node --check src/lib/db.js && node --check src/lib/storage.js",
     "smoke": "node src/scripts/smoke.js",
-    "verify": "npm run check && npm run smoke",
+    "test": "node --test test/*.test.js",
+    "verify": "npm run check && npm run smoke && npm test",
     "migrate": "node src/scripts/migrate.js"
   },
   "dependencies": {
