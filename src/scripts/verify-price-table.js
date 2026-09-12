@@ -50,10 +50,11 @@ try {
   const csvResponse = await app.inject({ method: 'GET', url: `/api/v1/price-table.csv?q=${encodeURIComponent(token)}` });
   assert.equal(csvResponse.statusCode, 200);
   assert.match(String(csvResponse.headers['content-type'] || ''), /text\/csv/i);
-  assert.match(csvResponse.body, new RegExp(productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.ok(csvResponse.body.includes(productName));
   assert.match(csvResponse.body, /42,50/);
   assert.doesNotMatch(csvResponse.body, /9876[.,]54/);
   assert.doesNotMatch(csvResponse.body, /supplier_cost/i);
+  assert.doesNotMatch(csvResponse.body, /reseller_price/i);
   console.log('PRICE_TABLE_INTEGRATION_OK');
 } finally {
   if (app) await app.close();
