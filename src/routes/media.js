@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { z } from 'zod';
 import { getDb } from '../lib/db.js';
-import { headObject, R2_PREFIXES, r2Status, signedUploadUrl } from '../lib/storage.js';
+import { headObject, R2_PREFIXES, r2Buckets, r2Status, signedUploadUrl } from '../lib/storage.js';
 
 const kinds = ['product-photo','thumbnail','mockup','template','artwork-original','artwork-preview','artwork-approved','proof','production'];
 const kindEnum = z.enum(kinds);
@@ -63,7 +63,7 @@ export async function registerMediaRoutes(app) {
   app.get('/api/v1/admin/storage/status', { preHandler: mediaStaff }, async () => ({
     provider: 'cloudflare-r2',
     status: await r2Status(),
-    bucket: process.env.R2_BUCKET || null,
+    buckets: r2Buckets(),
     publicBaseUrl: process.env.R2_PUBLIC_BASE_URL || null
   }));
 
@@ -132,11 +132,11 @@ export async function registerMediaRoutes(app) {
     const [result] = await db.execute(`
       INSERT INTO media_objects (kind,visibility,storage_provider,bucket_name,object_key,original_name,mime_type,size_bytes,checksum_sha256,metadata_json)
       VALUES (?,?, 'cloudflare-r2',?,?,?,?,?,?,?)
-      ON DUPLICATE KEY UPDATE kind=VALUES(kind),visibility=VALUES(visibility),original_name=VALUES(original_name),mime_type=VALUES(mime_type),size_bytes=VALUES(size_bytes),checksum_sha256=COALESCE(VALUES(checksum_sha256),checksum_sha256),metadata_json=VALUES(metadata_json)
+      ON DUPLICATE KEY UPDATE kind=VALUES(kind),visibility=VALUES(visibility),bucket_name=VALUES(bucket_name),original_name=VALUES(original_name),mime_type=VALUES(mime_type),size_bytes=VALUES(size_bytes),checksum_sha256=COALESCE(VALUES(checksum_sha256),checksum_sha256),metadata_json=VALUES(metadata_json)
     `, [
       parsed.data.kind,
       config.visibility,
-      process.env.R2_BUCKET,
+      remote.bucket,
       parsed.data.key,
       parsed.data.originalName || null,
       normalizeContentType(remote.contentType),
