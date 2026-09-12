@@ -6,6 +6,8 @@ DOMAIN="grafica.belastock.com.br"
 
 section(){ printf '\n============================================================\n%s\n============================================================\n' "$1"; }
 
+git_safe(){ git -c safe.directory="$APP_DIR" "$@"; }
+
 section "CENTRAL PRINTS - DIAGNOSTICO VPS"
 echo "DATE=$(date -Is)"
 echo "HOST=$(hostname -f 2>/dev/null || hostname)"
@@ -14,8 +16,9 @@ echo "USER=$(id -un)"
 section "APLICACAO"
 cd "$APP_DIR" 2>/dev/null || { echo "ERRO: APP_DIR inexistente: $APP_DIR"; exit 2; }
 echo "APP_DIR=$APP_DIR"
-echo "GIT_HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo SEM_GIT)"
-git status --short --branch 2>/dev/null || true
+stat -c 'APP_OWNER=%U APP_GROUP=%G' "$APP_DIR" 2>/dev/null || true
+echo "GIT_HEAD=$(git_safe rev-parse --short HEAD 2>/dev/null || echo SEM_GIT)"
+git_safe status --short --branch 2>/dev/null || true
 
 echo
 printf 'Node: '; node -v 2>/dev/null || true
