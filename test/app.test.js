@@ -17,6 +17,7 @@ test('GET / serves Central Prints home', async () => {
 
 for (const [url, marker] of [
   ['/catalogo.html', /Catálogo Central Prints/i],
+  ['/precos.html', /Tabela de preços/i],
   ['/produto.html', /Configurar produto/i],
   ['/checkout.html', /Finalizar/i],
   ['/pedido.html', /Acompanhe sua solicitação/i],

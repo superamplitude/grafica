@@ -8,6 +8,7 @@ import { dbStatus } from './lib/db.js';
 import { r2Status } from './lib/storage.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
+import { registerPriceTableRoutes } from './routes/price-table.js';
 import { registerSiteHeroRoutes } from './routes/site-hero.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerAdminRoutes } from './routes/admin.js';
@@ -62,6 +63,7 @@ export async function buildApp() {
   app.get('/api',async()=>({name:'Central Prints API',version:VERSION}));
 
   await registerPublicRoutes(app);
+  await registerPriceTableRoutes(app);
   await registerSiteHeroRoutes(app);
   await registerOrderRoutes(app);
   await registerArtworkRoutes(app);
