@@ -38,10 +38,28 @@ function dbDate(value) {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+function heroTextHasPricing(data = {}) {
+  const text = [data.eyebrow,data.title,data.body,data.cta_label,data.secondary_cta_label].filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  if (!text) return false;
+  return /r\$\s*\d|\bpre[cç]o\b|\ba partir de\b|\bpor apenas\b|\bde\s+r\$|\d+[.,]\d{2}(?:\s|$)|\b\d+\s*%\s*(?:off|de desconto)\b/i.test(text);
+}
+
 async function validateBannerMedia(db, ids) {
   const unique = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
   if (!unique.length) return true;
   const [rows] = await db.execute(`SELECT id FROM media_objects WHERE id IN (${unique.map(() => '?').join(',')}) AND kind='banner' AND visibility='public'`, unique);
+  return rows.length === unique.length;
+}
+
+async function validateHeroMediaReviews(db, ids) {
+  const unique = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
+  if (!unique.length) return false;
+  const [rows] = await db.execute(`
+    SELECT media_id FROM media_asset_reviews
+     WHERE media_id IN (${unique.map(() => '?').join(',')})
+       AND usage_type='hero' AND supplier_branding='clear' AND price_text='clear'
+       AND license_status IN ('owned','licensed') AND review_status='approved'
+  `, unique);
   return rows.length === unique.length;
 }
 
@@ -79,13 +97,18 @@ export async function registerAdminSiteRoutes(app) {
     const endsAt = dbDate(data.ends_at);
     if (startsAt === undefined || endsAt === undefined) return reply.code(400).send({ error: 'INVALID_BANNER_DATE' });
     if (startsAt && endsAt && startsAt >= endsAt) return reply.code(400).send({ error: 'INVALID_BANNER_PERIOD' });
+    if (data.placement === 'home-hero' && heroTextHasPricing(data)) return reply.code(409).send({ error:'HERO_PRICE_TEXT_NOT_ALLOWED' });
     const db = getDb();
     if (data.placement === 'home-hero') {
       const [countRows] = await db.query(`SELECT COUNT(*) AS n FROM banners WHERE placement='home-hero' AND status<>'archived'`);
       if (Number(countRows[0]?.n || 0) >= 6) return reply.code(409).send({ error: 'HERO_CAMPAIGN_LIMIT_REACHED', limit: 6 });
     }
-    const mediaOk = await validateBannerMedia(db, [data.desktop_media_id, data.mobile_media_id]);
+    const mediaIds=[Number(data.desktop_media_id||0),Number(data.mobile_media_id||0)];
+    const mediaOk = await validateBannerMedia(db, mediaIds);
     if (!mediaOk) return reply.code(409).send({ error: 'INVALID_BANNER_MEDIA' });
+    if (data.placement==='home-hero' && (data.status||'draft')==='active' && !await validateHeroMediaReviews(db,mediaIds)) {
+      return reply.code(409).send({ error:'HERO_MEDIA_REVIEW_REQUIRED' });
+    }
     const [result] = await db.execute(`
       INSERT INTO banners (name,placement,desktop_media_id,mobile_media_id,eyebrow,title,body,cta_label,cta_url,secondary_cta_label,secondary_cta_url,autoplay_seconds,sort_order,starts_at,ends_at,status)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -111,11 +134,22 @@ export async function registerAdminSiteRoutes(app) {
     const effectiveStart=startsAt===undefined?before.starts_at:startsAt;
     const effectiveEnd=endsAt===undefined?before.ends_at:endsAt;
     if(effectiveStart&&effectiveEnd&&new Date(effectiveStart)>=new Date(effectiveEnd))return reply.code(400).send({error:'INVALID_BANNER_PERIOD'});
-    const mediaOk = await validateBannerMedia(db, [
-      data.desktop_media_id === undefined ? Number(before.desktop_media_id || 0) : Number(data.desktop_media_id || 0),
-      data.mobile_media_id === undefined ? Number(before.mobile_media_id || 0) : Number(data.mobile_media_id || 0)
-    ]);
+    const effective={
+      placement:data.placement===undefined?before.placement:data.placement,
+      status:data.status===undefined?before.status:data.status,
+      eyebrow:data.eyebrow===undefined?before.eyebrow:data.eyebrow,
+      title:data.title===undefined?before.title:data.title,
+      body:data.body===undefined?before.body:data.body,
+      cta_label:data.cta_label===undefined?before.cta_label:data.cta_label,
+      secondary_cta_label:data.secondary_cta_label===undefined?before.secondary_cta_label:data.secondary_cta_label,
+      desktop_media_id:data.desktop_media_id===undefined?before.desktop_media_id:data.desktop_media_id,
+      mobile_media_id:data.mobile_media_id===undefined?before.mobile_media_id:data.mobile_media_id
+    };
+    if(effective.placement==='home-hero'&&heroTextHasPricing(effective))return reply.code(409).send({error:'HERO_PRICE_TEXT_NOT_ALLOWED'});
+    const mediaIds=[Number(effective.desktop_media_id||0),Number(effective.mobile_media_id||0)];
+    const mediaOk = await validateBannerMedia(db, mediaIds);
     if (!mediaOk) return reply.code(409).send({ error: 'INVALID_BANNER_MEDIA' });
+    if(effective.placement==='home-hero'&&effective.status==='active'&&!await validateHeroMediaReviews(db,mediaIds))return reply.code(409).send({error:'HERO_MEDIA_REVIEW_REQUIRED'});
     const map={name:data.name,placement:data.placement,desktop_media_id:data.desktop_media_id,mobile_media_id:data.mobile_media_id,eyebrow:data.eyebrow,title:data.title,body:data.body,cta_label:data.cta_label,cta_url:data.cta_url,secondary_cta_label:data.secondary_cta_label,secondary_cta_url:data.secondary_cta_url,autoplay_seconds:data.autoplay_seconds,sort_order:data.sort_order,starts_at:startsAt,ends_at:endsAt,status:data.status};
     const entries=Object.entries(map).filter(([,value])=>value!==undefined);
     if(entries.length)await db.execute(`UPDATE banners SET ${entries.map(([key])=>`${key}=?`).join(',')},updated_at=NOW() WHERE id=?`,[...entries.map(([,value])=>value),id]);
