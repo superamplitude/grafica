@@ -1,6 +1,6 @@
 import {
   S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand,
-  HeadObjectCommand, HeadBucketCommand
+  HeadObjectCommand, HeadBucketCommand, CreateBucketCommand, PutBucketCorsCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createWriteStream } from 'node:fs';
@@ -38,14 +38,49 @@ export function isR2Configured(){const b=r2Buckets();return Boolean(credentialsC
 function getClient(){if(!isR2Configured())throw new Error('R2_NOT_CONFIGURED');if(!client)client=new S3Client({region:'auto',endpoint:`https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,credentials:{accessKeyId:process.env.R2_ACCESS_KEY_ID,secretAccessKey:process.env.R2_SECRET_ACCESS_KEY}});return client}
 export function isPublicObjectKey(key){const normalized=String(key||'').replace(/^\/+/, '');return PUBLIC_PREFIXES.some((prefix)=>normalized.startsWith(prefix))}
 export function bucketForKey(key){const buckets=r2Buckets();return isPublicObjectKey(key)?buckets.publicBucket:buckets.privateBucket}
+
+async function ensureBucket(bucket){
+  try{await getClient().send(new HeadBucketCommand({Bucket:bucket}));return'present'}catch(error){
+    const status=Number(error?.$metadata?.httpStatusCode||0);
+    const code=String(error?.name||error?.Code||'');
+    if(status!==404&&!['NoSuchBucket','NotFound'].includes(code))throw error;
+  }
+  await getClient().send(new CreateBucketCommand({Bucket:bucket}));
+  await getClient().send(new HeadBucketCommand({Bucket:bucket}));
+  return'created';
+}
+
+export async function ensureR2Infrastructure({origin}={}){
+  if(!isR2Configured())throw new Error('R2_NOT_CONFIGURED');
+  const {publicBucket,privateBucket}=r2Buckets();
+  if(publicBucket===privateBucket)throw new Error('R2_BUCKETS_MUST_BE_DISTINCT');
+  const safeOrigin=String(origin||process.env.APP_URL||'https://grafica.belastock.com.br').replace(/\/$/,'');
+  const publicState=await ensureBucket(publicBucket);
+  const privateState=await ensureBucket(privateBucket);
+  const cors={
+    CORSRules:[{
+      AllowedOrigins:[safeOrigin],
+      AllowedMethods:['GET','HEAD','PUT'],
+      AllowedHeaders:['content-type','x-amz-*'],
+      ExposeHeaders:['ETag'],
+      MaxAgeSeconds:3600
+    }]
+  };
+  await Promise.all([
+    getClient().send(new PutBucketCorsCommand({Bucket:publicBucket,CORSConfiguration:cors})),
+    getClient().send(new PutBucketCorsCommand({Bucket:privateBucket,CORSConfiguration:cors}))
+  ]);
+  return{publicBucket,privateBucket,publicState,privateState,origin:safeOrigin,cors:true};
+}
+
 export async function r2Status(){
   if(!isR2Configured())return'unconfigured';
   const {publicBucket,privateBucket}=r2Buckets();
-  if(publicBucket===privateBucket&&String(process.env.R2_PUBLIC_BASE_URL||'').trim())return'unsafe-layout';
+  if(publicBucket===privateBucket)return'unsafe-layout';
   try{
     await Promise.all([
       getClient().send(new HeadBucketCommand({Bucket:publicBucket})),
-      publicBucket===privateBucket?Promise.resolve():getClient().send(new HeadBucketCommand({Bucket:privateBucket}))
+      getClient().send(new HeadBucketCommand({Bucket:privateBucket}))
     ]);
     return'ok';
   }catch{return'error'}
