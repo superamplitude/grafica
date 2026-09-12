@@ -89,7 +89,7 @@ export async function registerAdminPrepressRoutes(app) {
     `, [id]);
     if (!rows[0]) return reply.code(404).send({ error: 'ARTWORK_NOT_FOUND' });
     const [proofs] = await db.execute(`
-      SELECT pr.id,pr.version_no,pr.status,pr.customer_note,pr.approved_at,pr.created_at,
+      SELECT pr.id,pr.version_no,pr.status,pr.staff_note,pr.customer_note,pr.approved_at,pr.created_at,
              mo.id AS media_id,mo.original_name,mo.mime_type,mo.size_bytes
         FROM proofs pr JOIN media_objects mo ON mo.id=pr.media_id
        WHERE pr.artwork_id=? ORDER BY pr.version_no DESC,pr.id DESC
@@ -148,11 +148,11 @@ export async function registerAdminPrepressRoutes(app) {
       if (pending.length) { await connection.rollback(); return reply.code(409).send({ error:'PENDING_PROOF_ALREADY_EXISTS', proofId:pending[0].id }); }
       const [versions] = await connection.execute('SELECT COALESCE(MAX(version_no),0)+1 AS next_version FROM proofs WHERE artwork_id=?', [artworkId]);
       const version = Number(versions[0]?.next_version || 1);
-      const [result] = await connection.execute(`INSERT INTO proofs (artwork_id,media_id,version_no,status,customer_note) VALUES (?,?,?,'pending',?)`, [artworkId,parsed.data.mediaId,version,parsed.data.note || null]);
+      const [result] = await connection.execute(`INSERT INTO proofs (artwork_id,media_id,version_no,status,staff_note,customer_note) VALUES (?,?,?,'pending',?,NULL)`, [artworkId,parsed.data.mediaId,version,parsed.data.note || null]);
       await connection.execute(`UPDATE artworks SET status='preflight',updated_at=NOW() WHERE id=?`, [artworkId]);
       await connection.execute(`INSERT INTO artwork_events (artwork_id,event_type,actor_type,actor_id,payload_json) VALUES (?,'proof.created','staff',?,?)`, [artworkId,Number(request.user.sub),JSON.stringify({ proofId:Number(result.insertId),version,mediaId:parsed.data.mediaId,note:parsed.data.note||null })]);
       await connection.execute(`INSERT INTO order_events (order_id,event_type,actor_type,actor_id,payload_json) VALUES (?,'proof.created','staff',?,?)`, [artwork.order_id,Number(request.user.sub),JSON.stringify({ artworkId,proofId:Number(result.insertId),version })]);
-      await audit(connection,request,'proof.create','proof',result.insertId,null,{ artwork_id:artworkId,media_id:parsed.data.mediaId,version_no:version,status:'pending' });
+      await audit(connection,request,'proof.create','proof',result.insertId,null,{ artwork_id:artworkId,media_id:parsed.data.mediaId,version_no:version,status:'pending',staff_note:parsed.data.note||null });
       await connection.commit();
       return reply.code(201).send({ ok:true, proofId:Number(result.insertId), version, status:'pending' });
     } catch (error) {
