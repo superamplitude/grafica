@@ -13,10 +13,12 @@ fi
 
 mkdir -p "$(dirname "$APP_DIR")" "$BACKUP_ROOT"
 
+git_safe(){ git -c safe.directory="$APP_DIR" "$@"; }
+
 if [ -d "$APP_DIR/.git" ]; then
   cd "$APP_DIR"
-  git fetch origin main
-  git reset --hard origin/main
+  git_safe fetch origin main
+  git_safe reset --hard origin/main
 else
   if [ -d "$APP_DIR" ] && [ -n "$(ls -A "$APP_DIR" 2>/dev/null || true)" ]; then
     BACKUP_DIR="$BACKUP_ROOT/grafica_pre_node_$STAMP"
