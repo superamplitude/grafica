@@ -33,7 +33,7 @@ export async function registerAdminPrepressRoutes(app) {
     const db = getDb();
     const status = String(request.query?.status || '').trim();
     const q = String(request.query?.q || '').trim().slice(0,190);
-    const where = ['1=1'];
+    const where = ['a.superseded_at IS NULL'];
     const params = [];
     if (statusValues.includes(status)) { where.push('a.status=?'); params.push(status); }
     if (q) {
@@ -111,6 +111,7 @@ export async function registerAdminPrepressRoutes(app) {
       const [rows] = await connection.execute('SELECT * FROM artworks WHERE id=? FOR UPDATE', [id]);
       const before = rows[0];
       if (!before) { await connection.rollback(); return reply.code(404).send({ error: 'ARTWORK_NOT_FOUND' }); }
+      if (before.superseded_at) { await connection.rollback(); return reply.code(409).send({ error:'ARTWORK_SUPERSEDED' }); }
       if (before.status === 'approved') { await connection.rollback(); return reply.code(409).send({ error: 'APPROVED_ARTWORK_CANNOT_REQUEUE' }); }
       await connection.execute(`
         INSERT INTO preflight_jobs (artwork_id,status,attempts,available_at,locked_at,last_error)
@@ -140,6 +141,7 @@ export async function registerAdminPrepressRoutes(app) {
       const [artworks] = await connection.execute(`SELECT a.*,oi.order_id FROM artworks a JOIN order_items oi ON oi.id=a.order_item_id WHERE a.id=? FOR UPDATE`, [artworkId]);
       const artwork = artworks[0];
       if (!artwork) { await connection.rollback(); return reply.code(404).send({ error:'ARTWORK_NOT_FOUND' }); }
+      if (artwork.superseded_at) { await connection.rollback(); return reply.code(409).send({ error:'ARTWORK_SUPERSEDED' }); }
       if (artwork.status === 'rejected') { await connection.rollback(); return reply.code(409).send({ error:'REJECTED_ARTWORK_CANNOT_RECEIVE_PROOF' }); }
       const [mediaRows] = await connection.execute(`SELECT * FROM media_objects WHERE id=? LIMIT 1`, [parsed.data.mediaId]);
       const media = mediaRows[0];
@@ -176,6 +178,7 @@ export async function registerAdminPrepressRoutes(app) {
       `, [artworkId]);
       const before = rows[0];
       if (!before) { await connection.rollback(); return reply.code(404).send({ error:'ARTWORK_NOT_FOUND' }); }
+      if (before.superseded_at) { await connection.rollback(); return reply.code(409).send({ error:'ARTWORK_SUPERSEDED' }); }
       if (before.status === 'approved' && parsed.data.decision !== 'approve') { await connection.rollback(); return reply.code(409).send({ error:'APPROVED_ARTWORK_LOCKED' }); }
 
       const preflight = json(before.preflight_json) || {};
@@ -204,7 +207,7 @@ export async function registerAdminPrepressRoutes(app) {
 
       let release = null;
       if (target === 'approved') {
-        const [pendingRows] = await connection.execute(`SELECT COUNT(*) AS pending FROM artworks WHERE order_item_id=? AND status<>'approved'`, [before.order_item_id]);
+        const [pendingRows] = await connection.execute(`SELECT COUNT(*) AS pending FROM artworks WHERE order_item_id=? AND superseded_at IS NULL AND status<>'approved'`, [before.order_item_id]);
         const pending = Number(pendingRows[0]?.pending || 0);
         if (pending === 0) {
           const waitingStatus = ['paid','not_required'].includes(before.payment_status) ? 'ready-for-production' : 'artwork-approved-awaiting-payment';
