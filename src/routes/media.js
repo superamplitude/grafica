@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { z } from 'zod';
 import { getDb } from '../lib/db.js';
-import { headObject, R2_PREFIXES, r2Buckets, r2Status, signedUploadUrl } from '../lib/storage.js';
+import { headObject, R2_PREFIXES, r2Buckets, r2Status, signedReadUrl, signedUploadUrl } from '../lib/storage.js';
 
 const kinds = ['product-photo','thumbnail','mockup','template','artwork-original','artwork-preview','artwork-approved','proof','production'];
 const kindEnum = z.enum(kinds);
@@ -66,6 +66,16 @@ export async function registerMediaRoutes(app) {
     buckets: r2Buckets(),
     publicBaseUrl: process.env.R2_PUBLIC_BASE_URL || null
   }));
+
+  app.get('/api/v1/admin/media/:id/read-url', { preHandler: mediaStaff }, async (request, reply) => {
+    if (await r2Status() !== 'ok') return reply.code(503).send({ error: 'R2_NOT_READY' });
+    const db = getDb();
+    const id = Number(request.params.id);
+    if (!Number.isInteger(id) || id <= 0) return reply.code(400).send({ error: 'INVALID_MEDIA_ID' });
+    const [rows] = await db.execute('SELECT id,kind,visibility,object_key,original_name,mime_type,size_bytes FROM media_objects WHERE id=? LIMIT 1', [id]);
+    if (!rows[0]) return reply.code(404).send({ error: 'MEDIA_NOT_FOUND' });
+    return { media: rows[0], url: await signedReadUrl(rows[0].object_key, 600), expiresIn: 600 };
+  });
 
   app.post('/api/v1/admin/media/upload-intent', { preHandler: mediaStaff }, async (request, reply) => {
     const parsed = uploadSchema.safeParse(request.body);
