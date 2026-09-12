@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 APP_DIR="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
 REPO="https://github.com/superamplitude/grafica.git"
@@ -43,7 +43,13 @@ if [ "$NODE_MAJOR" -lt 20 ]; then
   exit 4
 fi
 
-npm ci --omit=dev || npm install --omit=dev
+if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+  echo "[NPM] Lockfile encontrado: usando npm ci."
+  npm ci --omit=dev
+else
+  echo "[NPM] Lockfile ainda não existe: usando npm install."
+  npm install --omit=dev
+fi
 
 if [ ! -f .env ]; then
   cp .env.example .env
@@ -58,7 +64,7 @@ fi
 pm2 startOrReload ecosystem.config.cjs --update-env
 pm2 save
 
-printf '\nCentral Prints instalada em: %s\n' "$APP_DIR"
+printf '\nCentral Prints instalada/atualizada em: %s\n' "$APP_DIR"
 printf 'Aplicação local: http://127.0.0.1:3210\n'
 printf 'Health check: http://127.0.0.1:3210/api/health\n'
-printf 'Próximo passo: configurar .env e reverse proxy do domínio.\n'
+printf 'Próximo passo: validar .env e reverse proxy do domínio.\n'
