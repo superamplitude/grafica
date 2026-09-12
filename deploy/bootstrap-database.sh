@@ -31,17 +31,40 @@ cp -a "$ENV_FILE" "$BACKUP_DIR/env.before"
 chmod 600 "$ENV_FILE" "$BACKUP_DIR/env.before"
 
 read_env(){ sed -n "s/^$1=//p" "$ENV_FILE" | tail -n1; }
-DB_NAME="$(read_env DB_NAME)"; DB_NAME="${DB_NAME:-central_prints}"
-DB_USER="$(read_env DB_USER)"; DB_USER="${DB_USER:-central_prints}"
+DB_NAME="$(read_env DB_NAME)"; DB_NAME="${DB_NAME:-centralprints}"
+DB_USER="$(read_env DB_USER)"; DB_USER="${DB_USER:-centralprints}"
 DB_PASSWORD="$(read_env DB_PASSWORD)"
 JWT_SECRET="$(read_env JWT_SECRET)"
 
-[[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ ]] || fail "DB_NAME invalido."
-[[ "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || fail "DB_USER invalido."
-[ ${#DB_NAME} -le 64 ] || fail "DB_NAME excede 64 caracteres."
-[ ${#DB_USER} -le 32 ] || fail "DB_USER excede 32 caracteres."
 [ -n "$DB_PASSWORD" ] || DB_PASSWORD="$(openssl rand -hex 24)"
 [ -n "$JWT_SECRET" ] || JWT_SECRET="$(openssl rand -hex 48)"
+
+legacy_db_ok(){
+  local name="$1" user="$2"
+  MYSQL_PWD="$DB_PASSWORD" mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u "$user" -D "$name" -NBe 'SELECT 1' 2>/dev/null | grep -qx '1'
+}
+
+# CloudPanel rejeita nomes com underscore no fluxo db:add. Se este for o antigo
+# default ainda nao criado, migra o nome de configuracao para um identificador
+# simples compativel antes de chamar a CLI. Um banco legado funcional nunca e
+# renomeado automaticamente.
+if [[ "$DB_NAME" == *_* || "$DB_USER" == *_* ]]; then
+  if legacy_db_ok "$DB_NAME" "$DB_USER"; then
+    echo "[INFO] Banco legado com underscore ja existe e esta acessivel; mantendo nomes atuais."
+  else
+    OLD_DB_NAME="$DB_NAME"; OLD_DB_USER="$DB_USER"
+    DB_NAME="${DB_NAME//_/}"
+    DB_USER="${DB_USER//_/}"
+    [ -n "$DB_NAME" ] || DB_NAME="centralprints"
+    [ -n "$DB_USER" ] || DB_USER="centralprints"
+    echo "[INFO] Nomes CloudPanel normalizados: ${OLD_DB_NAME}/${OLD_DB_USER} -> ${DB_NAME}/${DB_USER}"
+  fi
+fi
+
+[[ "$DB_NAME" =~ ^[A-Za-z0-9-]+$ ]] || fail "DB_NAME invalido para CloudPanel. Use apenas letras, numeros e hifen."
+[[ "$DB_USER" =~ ^[A-Za-z0-9-]+$ ]] || fail "DB_USER invalido para CloudPanel. Use apenas letras, numeros e hifen."
+[ ${#DB_NAME} -le 64 ] || fail "DB_NAME excede 64 caracteres."
+[ ${#DB_USER} -le 32 ] || fail "DB_USER excede 32 caracteres."
 
 log "Persistindo configuracao dedicada antes da criacao do banco"
 python3 - "$ENV_FILE" "$DB_NAME" "$DB_USER" "$DB_PASSWORD" "$JWT_SECRET" <<'PY'
@@ -77,6 +100,22 @@ app_db_ok(){
   MYSQL_PWD="$DB_PASSWORD" mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u "$DB_USER" -D "$DB_NAME" -NBe 'SELECT 1' 2>/dev/null | grep -qx '1'
 }
 
+show_cloudpanel_log(){
+  local logfile="$1"
+  [ -f "$logfile" ] || return 0
+  echo "================ CLOUDPANEL DB:ADD ================"
+  python3 - "$logfile" "$DB_PASSWORD" <<'PY'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]); secret=sys.argv[2]
+text=p.read_text(errors='replace')
+if secret:
+    text=text.replace(secret,'[REDACTED]')
+print(text[-12000:])
+PY
+  echo "===================================================="
+}
+
 log "Verificando se o banco dedicado ja esta acessivel"
 if app_db_ok; then
   echo "DB_PREEXISTENTE=sim"
@@ -87,6 +126,7 @@ if app_db_ok; then
     echo "DB_BACKUP=$DB_BACKUP"
   else
     chmod 600 "$BACKUP_DIR/clpctl-db-export.log" 2>/dev/null || true
+    cat "$BACKUP_DIR/clpctl-db-export.log" >&2 || true
     fail "Banco existente detectado, mas o CloudPanel nao conseguiu exporta-lo. Migrations nao serao executadas sem backup."
   fi
 else
@@ -103,11 +143,11 @@ else
   set -e
   chmod 600 "$BACKUP_DIR/clpctl-db-add.log" 2>/dev/null || true
 
-  if [ "$ADD_RC" -ne 0 ]; then
-    if ! app_db_ok; then
-      echo "[INFO] Saida do CloudPanel salva em $BACKUP_DIR/clpctl-db-add.log"
-      fail "CloudPanel nao criou o banco/usuario e a credencial dedicada continua invalida. Nada foi sobrescrito."
-    fi
+  if [ "$ADD_RC" -ne 0 ] || ! app_db_ok; then
+    show_cloudpanel_log "$BACKUP_DIR/clpctl-db-add.log"
+    clpctl db:add --help >"$BACKUP_DIR/clpctl-db-add-help.log" 2>&1 || true
+    chmod 600 "$BACKUP_DIR/clpctl-db-add-help.log" 2>/dev/null || true
+    fail "CloudPanel nao criou banco/usuario utilizavel. Evidencia acima; nada foi sobrescrito."
   fi
 fi
 
