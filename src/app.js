@@ -6,6 +6,7 @@ import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dbStatus } from './lib/db.js';
+import { registerPublicRoutes } from './routes/public.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,6 +49,22 @@ export async function buildApp() {
     name: 'Central Prints API',
     version: VERSION
   }));
+
+  await registerPublicRoutes(app);
+
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error(error);
+    if (error?.message === 'DATABASE_NOT_CONFIGURED') {
+      return reply.code(503).send({ error: 'DATABASE_NOT_READY' });
+    }
+    if (error?.code === 'ECONNREFUSED' || error?.code === 'ER_ACCESS_DENIED_ERROR' || error?.code === 'ER_BAD_DB_ERROR') {
+      return reply.code(503).send({ error: 'DATABASE_NOT_READY' });
+    }
+    const statusCode = Number(error?.statusCode || 500);
+    return reply.code(statusCode >= 400 && statusCode < 600 ? statusCode : 500).send({
+      error: statusCode >= 500 ? 'INTERNAL_ERROR' : (error?.code || 'REQUEST_ERROR')
+    });
+  });
 
   return app;
 }
