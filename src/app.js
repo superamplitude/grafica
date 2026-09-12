@@ -6,7 +6,10 @@ import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dbStatus } from './lib/db.js';
+import { registerAuth } from './plugins/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
+import { registerAuthRoutes } from './routes/auth.js';
+import { registerAdminRoutes } from './routes/admin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,23 +26,27 @@ export async function buildApp() {
     wildcard: false
   });
 
+  await registerAuth(app);
+
   app.get('/api/health', async () => ({
     ok: true,
     service: 'central-prints-node',
     version: VERSION,
     database: await dbStatus(),
+    auth: app.authConfigured ? 'configured' : 'unconfigured',
     timestamp: new Date().toISOString()
   }));
 
   app.get('/api/ready', async (_request, reply) => {
     const database = await dbStatus();
     const dbRequired = String(process.env.DB_REQUIRED ?? 'true').toLowerCase() !== 'false';
-    const ready = !dbRequired || database === 'ok';
+    const ready = (!dbRequired || database === 'ok') && app.authConfigured;
     return reply.code(ready ? 200 : 503).send({
       ok: ready,
       service: 'central-prints-node',
       version: VERSION,
       database,
+      auth: app.authConfigured ? 'configured' : 'unconfigured',
       dbRequired,
       timestamp: new Date().toISOString()
     });
@@ -51,6 +58,8 @@ export async function buildApp() {
   }));
 
   await registerPublicRoutes(app);
+  await registerAuthRoutes(app);
+  await registerAdminRoutes(app);
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error(error);
