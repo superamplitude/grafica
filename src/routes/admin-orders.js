@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getDb } from '../lib/db.js';
+import { releaseReadyOrderItems } from '../domain/production-release.js';
 
 const ORDER_STATUSES = [
   'awaiting-shipping-quote',
@@ -195,7 +196,7 @@ export async function registerAdminOrderRoutes(app) {
       const grandTotal = decimal(Math.max(0, subtotal + shippingTotal - discountTotal));
 
       let targetStatus = data.status || before.status;
-      let paymentStatus = data.payment_status || before.payment_status;
+      const paymentStatus = data.payment_status || before.payment_status;
       let paidTotal = data.paid_total === undefined ? decimal(before.paid_total) : decimal(data.paid_total);
 
       const shippingChanged = data.shipping_total !== undefined && shippingTotal !== decimal(before.shipping_total);
@@ -204,7 +205,7 @@ export async function registerAdminOrderRoutes(app) {
       }
 
       if (paymentStatus === 'paid' && data.paid_total === undefined) paidTotal = grandTotal;
-      if (!data.status && paymentStatus === 'paid' && before.status === 'awaiting-payment') targetStatus = 'paid';
+      if (!data.status && paymentStatus === 'paid' && targetStatus === 'awaiting-payment') targetStatus = 'paid';
 
       if (paymentStatus === 'paid' && paidTotal < grandTotal) {
         await connection.rollback();
@@ -265,11 +266,21 @@ export async function registerAdminOrderRoutes(app) {
         `, [id, before.status, targetStatus, Number(request.user.sub), JSON.stringify({ note: data.note || null })]);
       }
 
+      let release = null;
+      if (['paid','not_required'].includes(paymentStatus) && !['cancelled','completed','shipped'].includes(targetStatus)) {
+        release = await releaseReadyOrderItems(connection, {
+          orderId:id,
+          actorType:'staff',
+          actorId:Number(request.user.sub),
+          reason:'commercial-order-update'
+        });
+      }
+
       const [afterRows] = await connection.execute('SELECT * FROM orders WHERE id=? LIMIT 1', [id]);
       const after = afterRows[0];
       await writeAudit(connection, request, 'order.update', id, before, after);
       await connection.commit();
-      return { ok: true, order: normalizeOrder(after) };
+      return { ok: true, order: normalizeOrder(after), release };
     } catch (error) {
       try { await connection.rollback(); } catch {}
       throw error;
