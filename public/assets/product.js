@@ -1,0 +1,21 @@
+const money=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+const params=new URLSearchParams(location.search);const slug=params.get('slug');
+const variantSelect=document.querySelector('#variantSelect');const priceEl=document.querySelector('#itemPrice');const detail=document.querySelector('#variantDetail');
+const cart=()=>{try{return JSON.parse(localStorage.getItem('cp-cart')||'[]')}catch{return[]}};
+const saveCart=(items)=>{localStorage.setItem('cp-cart',JSON.stringify(items));updateCount();};
+const updateCount=()=>document.querySelector('#cartCount').textContent=cart().reduce((sum,item)=>sum+Number(item.lots||1),0);
+function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+async function api(url){const r=await fetch(url,{headers:{Accept:'application/json'}});if(!r.ok)throw new Error(`HTTP_${r.status}`);return r.json();}
+let product;
+async function load(){
+ if(!slug){document.querySelector('#productName').textContent='Produto não informado';return;}
+ try{product=await api(`/api/v1/configurator/${encodeURIComponent(slug)}`);}catch{document.querySelector('#productName').textContent='Produto indisponível';variantSelect.innerHTML='<option>Sem opções</option>';return;}
+ const p=product.product;document.title=`${p.name} · Central Prints`;document.querySelector('#productName').textContent=p.name;document.querySelector('#categoryName').textContent='Configure seu produto';document.querySelector('#productDescription').textContent='Escolha a combinação disponível. Gabaritos e arquivos técnicos ficam separados das imagens comerciais.';
+ document.querySelector('#backLabel').hidden=!p.supports_back;
+ variantSelect.innerHTML='<option value="">Selecione uma opção</option>'+product.variants.map(v=>`<option value="${v.id}">${esc(v.name)} · ${money.format(Number(v.public_price||0))}</option>`).join('');
+ const visuals=product.visuals||[];if(visuals.length){const gallery=document.querySelector('#gallery');const first=visuals.find(v=>v.role==='cover')||visuals[0];gallery.innerHTML=`<img id="mainVisual" src="${esc(first.url)}" alt="${esc(p.name)}">`+(visuals.length>1?`<div class="gallery-list">${visuals.map(v=>`<button type="button" data-url="${esc(v.url)}"><img src="${esc(v.url)}" alt=""></button>`).join('')}</div>`:'');gallery.addEventListener('click',e=>{const b=e.target.closest('[data-url]');if(b)document.querySelector('#mainVisual').src=b.dataset.url;});}
+ const templates=product.templates||[];if(templates.length)document.querySelector('#templatesBox').innerHTML=`<h2>Gabaritos</h2><p>Use o arquivo compatível com seu editor e confira medidas e sangria antes de enviar a arte.</p><div class="template-links">${templates.map(t=>`<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(String(t.template_type).toUpperCase())} · ${esc(t.side)}</a>`).join('')}</div>`;
+ }
+variantSelect.addEventListener('change',()=>{const v=product?.variants?.find(x=>String(x.id)===variantSelect.value);if(!v){priceEl.textContent='—';detail.textContent='';return;}priceEl.textContent=money.format(Number(v.public_price||0));detail.innerHTML=[v.quantity?`Quantidade do lote: <b>${esc(v.quantity)}</b>`:'',v.size_label?`Tamanho: <b>${esc(v.size_label)}</b>`:'',v.print_configuration?`Impressão: <b>${esc(v.print_configuration)}</b>`:'',v.production_days?`Produção estimada: <b>${esc(v.production_days)} dia(s)</b>`:''].filter(Boolean).join('<br>');});
+document.querySelector('#configForm').addEventListener('submit',e=>{e.preventDefault();const v=product?.variants?.find(x=>String(x.id)===variantSelect.value);if(!v)return alert('Selecione uma opção.');const items=cart();const configuration={notes:document.querySelector('#notes').value.trim(),artwork:{front:Boolean(product.product.supports_front),back:Boolean(product.product.supports_back)}};const existing=items.find(i=>i.variantId===Number(v.id)&&JSON.stringify(i.configuration)===JSON.stringify(configuration));if(existing)existing.lots=Math.min(20,Number(existing.lots||1)+1);else items.push({variantId:Number(v.id),lots:1,productName:product.product.name,variantName:v.name,displayPrice:Number(v.public_price||0),configuration});saveCart(items);location.href='/checkout.html';});
+updateCount();await load();
