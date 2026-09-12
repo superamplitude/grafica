@@ -1,15 +1,30 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  HeadBucketCommand
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 let client;
 
+export function isR2Configured() {
+  return Boolean(
+    process.env.R2_ACCOUNT_ID &&
+    process.env.R2_ACCESS_KEY_ID &&
+    process.env.R2_SECRET_ACCESS_KEY &&
+    process.env.R2_BUCKET
+  );
+}
+
 function getClient() {
+  if (!isR2Configured()) throw new Error('R2_NOT_CONFIGURED');
   if (!client) {
-    const accountId = process.env.R2_ACCOUNT_ID;
-    if (!accountId) throw new Error('R2_ACCOUNT_ID não configurado');
     client = new S3Client({
       region: 'auto',
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: process.env.R2_ACCESS_KEY_ID,
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
@@ -17,6 +32,16 @@ function getClient() {
     });
   }
   return client;
+}
+
+export async function r2Status() {
+  if (!isR2Configured()) return 'unconfigured';
+  try {
+    await getClient().send(new HeadBucketCommand({ Bucket: process.env.R2_BUCKET }));
+    return 'ok';
+  } catch {
+    return 'error';
+  }
 }
 
 export async function putObject({ key, body, contentType, cacheControl, metadata }) {
@@ -33,18 +58,38 @@ export async function putObject({ key, body, contentType, cacheControl, metadata
 }
 
 export async function deleteObject(key) {
-  await getClient().send(new DeleteObjectCommand({
-    Bucket: process.env.R2_BUCKET,
-    Key: key
-  }));
+  await getClient().send(new DeleteObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }));
 }
 
 export async function signedReadUrl(key, expiresIn = 900) {
   return getSignedUrl(
     getClient(),
     new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }),
-    { expiresIn }
+    { expiresIn: Math.min(3600, Math.max(60, Number(expiresIn) || 900)) }
   );
+}
+
+export async function signedUploadUrl({ key, contentType, expiresIn = 900, metadata }) {
+  const command = new PutObjectCommand({
+    Bucket: process.env.R2_BUCKET,
+    Key: key,
+    ContentType: contentType,
+    Metadata: metadata
+  });
+  return getSignedUrl(getClient(), command, {
+    expiresIn: Math.min(1800, Math.max(60, Number(expiresIn) || 900))
+  });
+}
+
+export async function headObject(key) {
+  const result = await getClient().send(new HeadObjectCommand({ Bucket: process.env.R2_BUCKET, Key: key }));
+  return {
+    size: Number(result.ContentLength || 0),
+    contentType: result.ContentType || null,
+    etag: result.ETag?.replaceAll('"', '') || null,
+    metadata: result.Metadata || {},
+    lastModified: result.LastModified || null
+  };
 }
 
 export function publicObjectUrl(key) {
