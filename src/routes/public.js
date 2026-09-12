@@ -15,7 +15,7 @@ async function productPayloadBySlug(slug) {
   const [products] = await db.execute(`
     SELECT p.id,p.name,p.slug,p.short_description,p.description,p.base_price,p.requires_artwork,
            p.supports_front,p.supports_back,p.config_json,p.seo_json,p.featured,
-           c.name AS category_name,c.slug AS category_slug
+           c.id AS category_id,c.name AS category_name,c.slug AS category_slug
       FROM products p
       LEFT JOIN categories c ON c.id=p.category_id
      WHERE p.slug=? AND p.status='active'
@@ -51,6 +51,7 @@ async function productPayloadBySlug(slug) {
 
   return {
     ...product,
+    base_price: Number(product.base_price || 0),
     config_json: asJson(product.config_json),
     seo_json: asJson(product.seo_json),
     variants: variants.map((row) => ({
@@ -78,12 +79,33 @@ export async function registerPublicRoutes(app) {
     return { items: rows.map((row) => ({ ...row, product_count: Number(row.product_count || 0) })) };
   });
 
+  app.get('/api/v1/catalog/summary', async () => {
+    const db = getDb();
+    const [rows] = await db.query(`
+      SELECT
+        (SELECT COUNT(*) FROM products WHERE status='active') AS products,
+        (SELECT COUNT(*) FROM categories WHERE status='active') AS categories,
+        (SELECT COUNT(*) FROM product_variants WHERE status='active' AND availability<>'unavailable') AS variants,
+        (SELECT MIN(public_price) FROM product_variants WHERE status='active' AND availability<>'unavailable' AND public_price>0) AS min_price,
+        (SELECT MAX(public_price) FROM product_variants WHERE status='active' AND availability<>'unavailable' AND public_price>0) AS max_price
+    `);
+    const row = rows[0] || {};
+    return {
+      products: Number(row.products || 0),
+      categories: Number(row.categories || 0),
+      variants: Number(row.variants || 0),
+      min_price: row.min_price == null ? null : Number(row.min_price),
+      max_price: row.max_price == null ? null : Number(row.max_price)
+    };
+  });
+
   app.get('/api/v1/products', async (request) => {
     const db = getDb();
     const category = String(request.query?.category || '').trim();
-    const q = String(request.query?.q || '').trim();
+    const q = String(request.query?.q || '').trim().slice(0, 160);
     const featured = String(request.query?.featured || '') === '1';
-    const limit = Math.min(100, Math.max(1, Number(request.query?.limit || 24) || 24));
+    const sort = String(request.query?.sort || 'featured').trim();
+    const limit = Math.min(60, Math.max(1, Number(request.query?.limit || 24) || 24));
     const offset = Math.max(0, Number(request.query?.offset || 0) || 0);
     const where = ["p.status='active'"];
     const params = [];
@@ -91,34 +113,55 @@ export async function registerPublicRoutes(app) {
     if (category) { where.push('c.slug=?'); params.push(category); }
     if (featured) where.push('p.featured=1');
     if (q) {
-      where.push('(p.name LIKE ? OR p.short_description LIKE ? OR p.description LIKE ?)');
-      const like = `%${q}%`; params.push(like, like, like);
+      where.push('(p.name LIKE ? OR p.short_description LIKE ? OR p.description LIKE ? OR p.sku LIKE ?)');
+      const like = `%${q}%`; params.push(like, like, like, like);
     }
+
+    const orderBy = {
+      featured: 'p.featured DESC,p.sort_order ASC,p.name ASC',
+      name: 'p.name ASC,p.id ASC',
+      'price-asc': 'starting_price ASC,p.name ASC',
+      'price-desc': 'starting_price DESC,p.name ASC',
+      newest: 'p.created_at DESC,p.id DESC'
+    }[sort] || 'p.featured DESC,p.sort_order ASC,p.name ASC';
+
+    const [countRows] = await db.execute(`
+      SELECT COUNT(*) AS total
+        FROM products p
+        LEFT JOIN categories c ON c.id=p.category_id
+       WHERE ${where.join(' AND ')}
+    `, params);
 
     const [rows] = await db.execute(`
       SELECT p.id,p.name,p.slug,p.short_description,p.base_price,p.featured,p.requires_artwork,
              c.name AS category_name,c.slug AS category_slug,
              COALESCE((SELECT MIN(NULLIF(v.public_price,0)) FROM product_variants v
                         WHERE v.product_id=p.id AND v.status='active' AND v.availability<>'unavailable'),p.base_price) AS starting_price,
+             (SELECT COUNT(*) FROM product_variants v2
+                WHERE v2.product_id=p.id AND v2.status='active' AND v2.availability<>'unavailable') AS variants_count,
              (SELECT m.object_key FROM product_media pm JOIN media_objects m ON m.id=pm.media_id
                 WHERE pm.product_id=p.id AND pm.role='cover' AND m.visibility='public'
                 ORDER BY pm.sort_order,pm.id LIMIT 1) AS cover_key
         FROM products p
         LEFT JOIN categories c ON c.id=p.category_id
        WHERE ${where.join(' AND ')}
-       ORDER BY p.featured DESC,p.sort_order,p.name
+       ORDER BY ${orderBy}
        LIMIT ? OFFSET ?
     `, [...params, limit, offset]);
 
+    const total = Number(countRows[0]?.total || 0);
     return {
       items: rows.map((row) => ({
         ...row,
         base_price: Number(row.base_price || 0),
         starting_price: Number(row.starting_price || 0),
+        variants_count: Number(row.variants_count || 0),
         cover_url: row.cover_key ? publicObjectUrl(row.cover_key) : null
       })),
+      total,
       limit,
-      offset
+      offset,
+      has_more: offset + rows.length < total
     };
   });
 
@@ -136,6 +179,10 @@ export async function registerPublicRoutes(app) {
         id: product.id,
         name: product.name,
         slug: product.slug,
+        category_name: product.category_name,
+        category_slug: product.category_slug,
+        short_description: product.short_description,
+        description: product.description,
         requires_artwork: product.requires_artwork,
         supports_front: product.supports_front,
         supports_back: product.supports_back,
