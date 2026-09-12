@@ -49,8 +49,17 @@ async function loadHomeContent(){
       if(blocks.templates.content?.ctaUrl)cta.href=blocks.templates.content.ctaUrl;
     }
     if(blocks.footer?.content?.body)document.querySelector('#footerBody').textContent=blocks.footer.content.body;
-    const hero=(data.banners||[]).find((b)=>b.placement==='home-hero'&&b.desktop_url);
-    if(hero){document.querySelector('#heroVisual').style.background=`url("${hero.desktop_url}") center/cover no-repeat`;document.querySelector('#heroVisual').innerHTML='';}
+
+    const campaign=(data.banners||[]).find((b)=>b.placement==='home-hero');
+    if(campaign){
+      if(campaign.eyebrow)document.querySelector('#heroEyebrow').textContent=campaign.eyebrow;
+      if(campaign.title)document.querySelector('#heroTitle').textContent=campaign.title;
+      if(campaign.body)document.querySelector('#heroBody').textContent=campaign.body;
+      const primary=document.querySelector('#heroPrimary');
+      if(campaign.cta_label)primary.textContent=campaign.cta_label;
+      if(campaign.cta_url)primary.href=campaign.cta_url;
+      if(campaign.desktop_url){document.querySelector('#heroVisual').style.background=`url("${campaign.desktop_url}") center/cover no-repeat`;document.querySelector('#heroVisual').innerHTML='';}
+    }
   }catch(error){console.info('Conteúdo editorial indisponível:',error.message);}
 }
 
