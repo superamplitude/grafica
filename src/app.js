@@ -5,10 +5,11 @@ import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dbPing } from './lib/db.js';
+import { dbStatus } from './lib/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const VERSION = '3.0.0-alpha.1';
 
 export async function buildApp() {
   const app = Fastify({ logger: true, trustProxy: true });
@@ -21,25 +22,31 @@ export async function buildApp() {
     wildcard: false
   });
 
-  app.get('/api/health', async () => {
-    let database = 'not-configured';
-    try {
-      database = await dbPing() ? 'ok' : 'error';
-    } catch {
-      database = 'error';
-    }
-    return {
-      ok: database !== 'error',
+  app.get('/api/health', async () => ({
+    ok: true,
+    service: 'central-prints-node',
+    version: VERSION,
+    database: await dbStatus(),
+    timestamp: new Date().toISOString()
+  }));
+
+  app.get('/api/ready', async (_request, reply) => {
+    const database = await dbStatus();
+    const dbRequired = String(process.env.DB_REQUIRED ?? 'true').toLowerCase() !== 'false';
+    const ready = !dbRequired || database === 'ok';
+    return reply.code(ready ? 200 : 503).send({
+      ok: ready,
       service: 'central-prints-node',
-      version: '3.0.0-alpha.1',
+      version: VERSION,
       database,
+      dbRequired,
       timestamp: new Date().toISOString()
-    };
+    });
   });
 
   app.get('/api', async () => ({
     name: 'Central Prints API',
-    version: '3.0.0-alpha.1'
+    version: VERSION
   }));
 
   return app;
