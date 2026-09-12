@@ -14,14 +14,13 @@ fail(){ echo "[ERRO] $*" >&2; exit 1; }
 log(){ printf '\n[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
 
 [ "$(id -u)" -eq 0 ] || fail "Execute como root."
-command -v mysql >/dev/null 2>&1 || fail "Cliente mysql nao encontrado."
-command -v openssl >/dev/null 2>&1 || fail "openssl nao encontrado."
-command -v node >/dev/null 2>&1 || fail "Node.js nao encontrado."
-command -v npm >/dev/null 2>&1 || fail "npm nao encontrado."
-command -v pm2 >/dev/null 2>&1 || fail "PM2 nao encontrado."
-[ -d "$APP_DIR/.git" ] || fail "Aplicacao/repositório nao encontrado em $APP_DIR"
+for cmd in clpctl mysql openssl node npm pm2 python3 curl; do
+  command -v "$cmd" >/dev/null 2>&1 || fail "Comando obrigatorio nao encontrado: $cmd"
+done
+[ -d "$APP_DIR/.git" ] || fail "Aplicacao/repositorio nao encontrado em $APP_DIR"
 
 mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
 cd "$APP_DIR"
 git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
 
@@ -39,41 +38,12 @@ JWT_SECRET="$(read_env JWT_SECRET)"
 
 [[ "$DB_NAME" =~ ^[A-Za-z0-9_]+$ ]] || fail "DB_NAME invalido."
 [[ "$DB_USER" =~ ^[A-Za-z0-9_]+$ ]] || fail "DB_USER invalido."
+[ ${#DB_NAME} -le 64 ] || fail "DB_NAME excede 64 caracteres."
+[ ${#DB_USER} -le 32 ] || fail "DB_USER excede 32 caracteres."
 [ -n "$DB_PASSWORD" ] || DB_PASSWORD="$(openssl rand -hex 24)"
 [ -n "$JWT_SECRET" ] || JWT_SECRET="$(openssl rand -hex 48)"
 
-log "Validando acesso administrativo ao MySQL/MariaDB"
-mysql -NBe 'SELECT VERSION();' > "$BACKUP_DIR/db-version.txt" || fail "Nao foi possivel acessar MySQL/MariaDB como root/socket."
-echo "DB_SERVER=$(cat "$BACKUP_DIR/db-version.txt")"
-
-EXISTING_DB="$(mysql -NBe "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='$DB_NAME' LIMIT 1" || true)"
-if [ "$EXISTING_DB" = "$DB_NAME" ]; then
-  log "Banco existente detectado; criando backup antes de migrations"
-  if command -v mysqldump >/dev/null 2>&1; then
-    mysqldump --single-transaction --routines --triggers --events --databases "$DB_NAME" > "$BACKUP_DIR/${DB_NAME}.sql"
-    gzip -f "$BACKUP_DIR/${DB_NAME}.sql"
-    chmod 600 "$BACKUP_DIR/${DB_NAME}.sql.gz"
-    echo "DB_BACKUP=$BACKUP_DIR/${DB_NAME}.sql.gz"
-  else
-    fail "Banco existente detectado mas mysqldump nao esta disponivel; abortando para nao migrar sem backup."
-  fi
-else
-  echo "DB_PREEXISTENTE=nao"
-fi
-
-log "Criando banco e usuario dedicados"
-mysql <<SQL
-CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$DB_PASSWORD';
-CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
-ALTER USER '$DB_USER'@'127.0.0.1' IDENTIFIED BY '$DB_PASSWORD';
-ALTER USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
-GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'127.0.0.1';
-GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'localhost';
-FLUSH PRIVILEGES;
-SQL
-
-log "Persistindo segredos somente no .env local"
+log "Persistindo configuracao dedicada antes da criacao do banco"
 python3 - "$ENV_FILE" "$DB_NAME" "$DB_USER" "$DB_PASSWORD" "$JWT_SECRET" <<'PY'
 from pathlib import Path
 import sys
@@ -103,8 +73,48 @@ path.write_text('\n'.join(out)+'\n')
 PY
 chmod 600 "$ENV_FILE"
 
-log "Validando credencial dedicada antes das migrations"
-MYSQL_PWD="$DB_PASSWORD" mysql -h 127.0.0.1 -u "$DB_USER" -D "$DB_NAME" -NBe 'SELECT 1' | grep -qx '1' || fail "Usuario dedicado nao conseguiu acessar o banco."
+app_db_ok(){
+  MYSQL_PWD="$DB_PASSWORD" mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u "$DB_USER" -D "$DB_NAME" -NBe 'SELECT 1' 2>/dev/null | grep -qx '1'
+}
+
+log "Verificando se o banco dedicado ja esta acessivel"
+if app_db_ok; then
+  echo "DB_PREEXISTENTE=sim"
+  log "Criando backup CloudPanel antes das migrations"
+  DB_BACKUP="$BACKUP_DIR/${DB_NAME}.before.sql.gz"
+  if clpctl db:export --databaseName="$DB_NAME" --file="$DB_BACKUP" >"$BACKUP_DIR/clpctl-db-export.log" 2>&1; then
+    chmod 600 "$DB_BACKUP" "$BACKUP_DIR/clpctl-db-export.log" 2>/dev/null || true
+    echo "DB_BACKUP=$DB_BACKUP"
+  else
+    chmod 600 "$BACKUP_DIR/clpctl-db-export.log" 2>/dev/null || true
+    fail "Banco existente detectado, mas o CloudPanel nao conseguiu exporta-lo. Migrations nao serao executadas sem backup."
+  fi
+else
+  echo "DB_PREEXISTENTE=nao-ou-credencial-ainda-nao-criada"
+  log "Criando banco e usuario pelo CloudPanel"
+  set +e
+  clpctl db:add \
+    --domainName="$DOMAIN" \
+    --databaseName="$DB_NAME" \
+    --databaseUserName="$DB_USER" \
+    --databaseUserPassword="$DB_PASSWORD" \
+    >"$BACKUP_DIR/clpctl-db-add.log" 2>&1
+  ADD_RC=$?
+  set -e
+  chmod 600 "$BACKUP_DIR/clpctl-db-add.log" 2>/dev/null || true
+
+  if [ "$ADD_RC" -ne 0 ]; then
+    if ! app_db_ok; then
+      echo "[INFO] Saida do CloudPanel salva em $BACKUP_DIR/clpctl-db-add.log"
+      fail "CloudPanel nao criou o banco/usuario e a credencial dedicada continua invalida. Nada foi sobrescrito."
+    fi
+  fi
+fi
+
+log "Validando credencial dedicada"
+app_db_ok || fail "Usuario dedicado nao conseguiu acessar $DB_NAME via 127.0.0.1:3306."
+MYSQL_PWD="$DB_PASSWORD" mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u "$DB_USER" -D "$DB_NAME" -NBe 'SELECT VERSION();' > "$BACKUP_DIR/db-version.txt"
+echo "DB_SERVER=$(cat "$BACKUP_DIR/db-version.txt")"
 
 log "Executando migrations versionadas"
 npm run migrate
