@@ -55,6 +55,9 @@ else
   npm install --omit=dev
 fi
 
+log "Validando inicializacao Fastify"
+npm run smoke
+
 log "Reiniciando PM2 limpo"
 pm2 delete central-prints >/dev/null 2>&1 || true
 pm2 start ecosystem.config.cjs --update-env
