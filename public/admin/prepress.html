@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pré-impressão · Super Admin · Central Prints</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/admin/admin-extra.css">
+  <link rel="stylesheet" href="/admin/prepress.css">
+</head>
+<body class="prepress-page">
+  <div class="prepress-shell">
+    <header class="prepress-topbar">
+      <div>
+        <a href="/admin/" class="prepress-back">← Super Admin</a>
+        <h1>Pré-impressão</h1>
+        <p>Conferência de artes, preflight, provas digitais e liberação segura para produção.</p>
+      </div>
+      <div class="prepress-runtime">
+        <strong id="prepressUser">Carregando…</strong>
+        <span id="prepressRole"></span>
+        <small id="storageState">Armazenamento: verificando…</small>
+      </div>
+    </header>
+
+    <section class="panel prepress-filters">
+      <form id="prepressFilterForm">
+        <label>Busca
+          <input id="prepressSearch" type="search" placeholder="Pedido, cliente, produto ou arquivo">
+        </label>
+        <label>Status
+          <select id="prepressStatus"><option value="">Todos</option></select>
+        </label>
+        <button class="action primary" type="submit">Filtrar</button>
+        <button class="action" id="prepressReload" type="button">Atualizar</button>
+      </form>
+      <div class="prepress-summary" id="prepressSummary"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Fila de artes</h2>
+        <span id="prepressMessage">Carregando…</span>
+      </div>
+      <div class="prepress-table-wrap">
+        <table class="table prepress-table">
+          <thead><tr><th>Pedido</th><th>Produto</th><th>Arquivo</th><th>Preflight</th><th>Arte</th><th>Prova</th><th></th></tr></thead>
+          <tbody id="prepressRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="prepressDetail" class="panel prepress-detail" hidden>
+      <div class="panel-head detail-head">
+        <div>
+          <span class="detail-kicker">Arte selecionada</span>
+          <h2 id="detailTitle">—</h2>
+          <p id="detailMeta">—</p>
+        </div>
+        <div class="detail-head-actions">
+          <button class="action" id="viewOriginal" type="button">Abrir original</button>
+          <button class="action" id="closePrepressDetail" type="button">Fechar</button>
+        </div>
+      </div>
+
+      <div class="prepress-detail-grid">
+        <section class="prepress-card">
+          <h3>Diagnóstico automático</h3>
+          <div id="preflightState"></div>
+          <div id="preflightChecks" class="preflight-checks"></div>
+          <button class="action" id="requeuePreflight" type="button">Refazer preflight</button>
+        </section>
+
+        <section class="prepress-card">
+          <h3>Decisão humana</h3>
+          <label>Observação
+            <textarea id="decisionNote" rows="4" maxlength="5000" placeholder="Motivo da aprovação, correção ou rejeição"></textarea>
+          </label>
+          <label id="overrideWrap" class="override-wrap" hidden><input id="decisionOverride" type="checkbox"> Aprovação excepcional de Super Admin</label>
+          <div class="decision-actions">
+            <button class="action primary" data-decision="approve" type="button">Aprovar arte</button>
+            <button class="action" data-decision="changes" type="button">Pedir correção</button>
+            <button class="action danger-action" data-decision="reject" type="button">Rejeitar</button>
+          </div>
+          <p class="safety-note">A aprovação não envia pedido ao fornecedor. Ela apenas libera a fila interna quando pagamento e demais requisitos estiverem válidos.</p>
+        </section>
+
+        <section class="prepress-card proof-card">
+          <h3>Prova digital para o cliente</h3>
+          <form id="proofUploadForm">
+            <label>Arquivo da prova
+              <input id="proofFile" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" required>
+            </label>
+            <label>Nota interna
+              <input id="proofNote" maxlength="5000" placeholder="Ex.: versão com sangria revisada">
+            </label>
+            <button class="action primary" type="submit">Enviar nova prova</button>
+            <span id="proofUploadMessage"></span>
+          </form>
+          <div id="proofHistory" class="proof-history"></div>
+        </section>
+      </div>
+
+      <section class="prepress-card artwork-events-card">
+        <h3>Histórico técnico</h3>
+        <div id="artworkEvents" class="artwork-events"></div>
+      </section>
+    </section>
+  </div>
+  <script type="module" src="/admin/prepress.js"></script>
+</body>
+</html>
