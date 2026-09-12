@@ -5,6 +5,7 @@ import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dbStatus } from './lib/db.js';
+import { r2Status } from './lib/storage.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerAuthRoutes } from './routes/auth.js';
@@ -23,8 +24,34 @@ export async function buildApp() {
   await app.register(fastifyStatic, { root:path.join(__dirname,'..','public'),prefix:'/',wildcard:false });
   await registerAuth(app);
 
-  app.get('/api/health',async()=>({ok:true,service:'central-prints-node',version:VERSION,database:await dbStatus(),auth:app.authConfigured?'configured':'unconfigured',timestamp:new Date().toISOString()}));
-  app.get('/api/ready',async(_request,reply)=>{const database=await dbStatus();const dbRequired=String(process.env.DB_REQUIRED??'true').toLowerCase()!=='false';const ready=(!dbRequired||database==='ok')&&app.authConfigured;return reply.code(ready?200:503).send({ok:ready,service:'central-prints-node',version:VERSION,database,auth:app.authConfigured?'configured':'unconfigured',dbRequired,timestamp:new Date().toISOString()})});
+  app.get('/api/health',async()=>({
+    ok:true,
+    service:'central-prints-node',
+    version:VERSION,
+    database:await dbStatus(),
+    storage:await r2Status(),
+    auth:app.authConfigured?'configured':'unconfigured',
+    timestamp:new Date().toISOString()
+  }));
+
+  app.get('/api/ready',async(_request,reply)=>{
+    const database=await dbStatus();
+    const storage=await r2Status();
+    const dbRequired=String(process.env.DB_REQUIRED??'true').toLowerCase()!=='false';
+    const r2Required=String(process.env.R2_REQUIRED??'false').toLowerCase()==='true';
+    const ready=(!dbRequired||database==='ok')&&(!r2Required||storage==='ok')&&app.authConfigured;
+    return reply.code(ready?200:503).send({
+      ok:ready,
+      service:'central-prints-node',
+      version:VERSION,
+      database,
+      storage,
+      auth:app.authConfigured?'configured':'unconfigured',
+      dbRequired,
+      r2Required,
+      timestamp:new Date().toISOString()
+    });
+  });
   app.get('/api',async()=>({name:'Central Prints API',version:VERSION}));
 
   await registerPublicRoutes(app);
