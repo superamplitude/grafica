@@ -11,6 +11,7 @@ import { registerPublicRoutes } from './routes/public.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAdminCatalogRoutes } from './routes/admin-catalog.js';
+import { registerAdminSiteRoutes } from './routes/admin-site.js';
 import { registerMediaRoutes } from './routes/media.js';
 import { registerOrderRoutes } from './routes/orders.js';
 import { registerArtworkRoutes } from './routes/artworks.js';
@@ -61,6 +62,7 @@ export async function buildApp() {
   await registerAuthRoutes(app);
   await registerAdminRoutes(app);
   await registerAdminCatalogRoutes(app);
+  await registerAdminSiteRoutes(app);
   await registerMediaRoutes(app);
 
   app.setErrorHandler((error,request,reply)=>{request.log.error(error);if(error?.message==='DATABASE_NOT_CONFIGURED')return reply.code(503).send({error:'DATABASE_NOT_READY'});if(error?.message==='R2_NOT_CONFIGURED')return reply.code(503).send({error:'R2_NOT_READY'});if(error?.code==='ECONNREFUSED'||error?.code==='ER_ACCESS_DENIED_ERROR'||error?.code==='ER_BAD_DB_ERROR')return reply.code(503).send({error:'DATABASE_NOT_READY'});const statusCode=Number(error?.statusCode||500);return reply.code(statusCode>=400&&statusCode<600?statusCode:500).send({error:statusCode>=500?'INTERNAL_ERROR':(error?.code||'REQUEST_ERROR')})});
