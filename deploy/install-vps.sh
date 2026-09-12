@@ -24,7 +24,7 @@ else
     BACKUP_DIR="$BACKUP_ROOT/grafica_pre_node_$STAMP"
     mkdir -p "$BACKUP_DIR"
     cp -a "$APP_DIR/." "$BACKUP_DIR/"
-    echo "Backup do conteúdo anterior criado em: $BACKUP_DIR"
+    echo "Backup do conteudo anterior criado em: $BACKUP_DIR"
     find "$APP_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
   else
     mkdir -p "$APP_DIR"
@@ -35,38 +35,20 @@ else
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "ERRO: Node.js 20+ ainda não está instalado." >&2
+  echo "ERRO: Node.js 20+ ainda nao esta instalado." >&2
   exit 3
 fi
 
 NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]")"
 if [ "$NODE_MAJOR" -lt 20 ]; then
-  echo "ERRO: Node.js 20+ é obrigatório. Atual: $(node -v)" >&2
+  echo "ERRO: Node.js 20+ e obrigatorio. Atual: $(node -v)" >&2
   exit 4
-fi
-
-if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-  echo "[NPM] Lockfile encontrado: usando npm ci."
-  npm ci --omit=dev
-else
-  echo "[NPM] Lockfile ainda não existe: usando npm install."
-  npm install --omit=dev
-fi
-
-if [ ! -f .env ]; then
-  cp .env.example .env
-  chmod 600 .env
-  echo "Criado .env. Configure banco, R2 e JWT antes de produção."
 fi
 
 if ! command -v pm2 >/dev/null 2>&1; then
   npm install -g pm2
 fi
 
-pm2 startOrReload ecosystem.config.cjs --update-env
-pm2 save
+[ -f .env ] || { cp .env.example .env; chmod 600 .env; }
 
-printf '\nCentral Prints instalada/atualizada em: %s\n' "$APP_DIR"
-printf 'Aplicação local: http://127.0.0.1:3210\n'
-printf 'Health check: http://127.0.0.1:3210/api/health\n'
-printf 'Próximo passo: validar .env e reverse proxy do domínio.\n'
+exec bash deploy/repair-runtime.sh
