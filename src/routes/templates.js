@@ -6,7 +6,7 @@ const types = ['pdf','svg','eps','cdr','ai','psd','indd','canva','other'];
 const typeEnum = z.enum(types);
 const sideEnum = z.enum(['front','back','duplex','general']);
 
-const templateSchema = z.object({
+const templateFields = z.object({
   media_id: z.number().int().positive().optional().nullable(),
   external_url: z.string().url().max(1000).optional().nullable(),
   template_type: typeEnum,
@@ -16,7 +16,9 @@ const templateSchema = z.object({
   height_mm: z.number().positive().max(100000).optional().nullable(),
   bleed_mm: z.number().min(0).max(1000).optional().nullable(),
   status: z.enum(['active','inactive']).optional()
-}).superRefine((data, ctx) => {
+});
+
+function validateTemplateSource(data, ctx) {
   if (!data.media_id && !data.external_url) ctx.addIssue({ code:'custom', path:['media_id'], message:'media_id ou external_url é obrigatório' });
   if (data.media_id && data.external_url) ctx.addIssue({ code:'custom', path:['external_url'], message:'use apenas uma origem' });
   if (data.template_type === 'canva') {
@@ -30,7 +32,10 @@ const templateSchema = z.object({
   } else if (data.external_url) {
     ctx.addIssue({ code:'custom', path:['external_url'], message:'arquivos técnicos devem ser hospedados no armazenamento próprio' });
   }
-});
+}
+
+const templateCreateSchema = templateFields.superRefine(validateTemplateSource);
+const templateUpdateSchema = templateFields.partial();
 
 const LABELS = Object.freeze({
   pdf:'PDF', svg:'SVG', eps:'EPS', cdr:'CorelDRAW', ai:'Illustrator', psd:'Photoshop', indd:'InDesign', canva:'Canva', other:'Outro'
@@ -76,6 +81,7 @@ function serialize(row) {
 export async function registerTemplateRoutes(app) {
   const staff = app.requireRole('super_admin','admin','operations','prepress','support');
   const admins = app.requireRole('super_admin','admin');
+  const verifiers = app.requireRole('super_admin','admin','prepress');
 
   app.get('/api/v1/products/:slug/templates', async (request, reply) => {
     const db = getDb();
@@ -110,7 +116,7 @@ export async function registerTemplateRoutes(app) {
   });
 
   app.post('/api/v1/admin/catalog/products/:id/templates', { preHandler:admins }, async (request, reply) => {
-    const parsed = templateSchema.safeParse(request.body);
+    const parsed = templateCreateSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error:'INVALID_TEMPLATE', details:parsed.error.flatten() });
     const db = getDb();
     const productId = Number(request.params.id);
@@ -128,7 +134,7 @@ export async function registerTemplateRoutes(app) {
   });
 
   app.patch('/api/v1/admin/catalog/templates/:id', { preHandler:admins }, async (request, reply) => {
-    const parsed = templateSchema.partial().safeParse(request.body);
+    const parsed = templateUpdateSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error:'INVALID_TEMPLATE', details:parsed.error.flatten() });
     const db = getDb();
     const id = Number(request.params.id);
@@ -160,7 +166,7 @@ export async function registerTemplateRoutes(app) {
     return { ok:true, template:serialize(afterRows[0]) };
   });
 
-  app.post('/api/v1/admin/catalog/templates/:id/verify', { preHandler:admins }, async (request, reply) => {
+  app.post('/api/v1/admin/catalog/templates/:id/verify', { preHandler:verifiers }, async (request, reply) => {
     const body = z.object({ brand_neutral:z.boolean(), approved:z.boolean(), note:z.string().max(2000).optional().nullable() }).safeParse(request.body);
     if (!body.success) return reply.code(400).send({ error:'INVALID_TEMPLATE_VERIFICATION' });
     const db = getDb();
