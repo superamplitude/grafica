@@ -2,20 +2,18 @@
 set -Eeuo pipefail
 
 APP_DIR="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
-SOURCE="$APP_DIR/deploy/autodeploy-check.sh"
-TARGET="/usr/local/sbin/central-prints-autodeploy"
+CHECKER="$APP_DIR/deploy/autodeploy-check.sh"
 SERVICE="/etc/systemd/system/central-prints-autodeploy.service"
 TIMER="/etc/systemd/system/central-prints-autodeploy.timer"
 
 fail(){ echo "[ERRO] $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || fail "Execute como root."
-[ -f "$SOURCE" ] || fail "Arquivo ausente: $SOURCE"
+[ -f "$CHECKER" ] || fail "Arquivo ausente: $CHECKER"
 command -v systemctl >/dev/null 2>&1 || fail "systemd/systemctl nao encontrado."
-
-install -o root -g root -m 700 "$SOURCE" "$TARGET"
+chmod 700 "$CHECKER"
 install -d -o root -g root -m 700 /var/lib/central-prints-autodeploy
 
-cat > "$SERVICE" <<'UNIT'
+cat > "$SERVICE" <<UNIT
 [Unit]
 Description=Central Prints CI-gated pull autodeploy
 After=network-online.target
@@ -25,7 +23,7 @@ Wants=network-online.target
 Type=oneshot
 User=root
 Group=root
-ExecStart=/usr/local/sbin/central-prints-autodeploy
+ExecStart=/bin/bash $CHECKER
 Environment=NPM_CONFIG_CACHE=/tmp/central-prints-npm-cache
 Nice=5
 IOSchedulingClass=best-effort
@@ -35,6 +33,7 @@ PrivateTmp=true
 ProtectHome=read-only
 ProtectSystem=full
 ReadWritePaths=/home/belastock-grafica /var/lib/central-prints-autodeploy /var/lock /root/.pm2 /tmp
+KillMode=process
 TimeoutStartSec=20min
 UNIT
 
@@ -63,6 +62,7 @@ printf '============================================================\n'
 printf 'Origem: GitHub main -> CI Central Prints -> VPS\n'
 printf 'Intervalo: aproximadamente 5 minutos\n'
 printf 'Regra: somente commit com CI push concluido em SUCCESS\n'
+printf 'Checker versionado: %s\n' "$CHECKER"
 printf 'Lock compartilhado: /var/lock/central-prints-actions-deploy.lock\n'
 printf 'Timer: '
 systemctl is-active central-prints-autodeploy.timer || true
