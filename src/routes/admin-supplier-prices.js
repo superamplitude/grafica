@@ -1,8 +1,16 @@
 import { z } from 'zod';
 import { getDb } from '../lib/db.js';
+import { stageSupplierPriceBuffer } from '../domain/supplier-price-staging.js';
 
 const rowReviewSchema=z.object({review_status:z.enum(['pending','approved','rejected'])});
 const importReviewSchema=z.object({status:z.enum(['staged','reviewed','rejected'])});
+const uploadSchema=z.object({
+  filename:z.string().min(1).max(500),
+  source_name:z.string().min(1).max(255).optional(),
+  supplier_id:z.number().int().positive().optional().nullable(),
+  expected_sha256:z.string().regex(/^[a-f0-9]{64}$/i).optional().nullable(),
+  content_base64:z.string().min(4).max(30_000_000)
+});
 
 async function audit(db,request,action,entityType,entityId,before,after){
   await db.execute(`INSERT INTO audit_logs (actor_type,actor_id,action,entity_type,entity_id,before_json,after_json,ip_address)
@@ -12,6 +20,26 @@ async function audit(db,request,action,entityType,entityId,before,after){
 export async function registerAdminSupplierPriceRoutes(app){
   const staff=app.requireRole('super_admin','admin','operations','support');
   const admins=app.requireRole('super_admin','admin');
+
+  app.post('/api/v1/admin/supplier-prices/imports',{preHandler:admins,bodyLimit:32*1024*1024},async(request,reply)=>{
+    const parsed=uploadSchema.safeParse(request.body);if(!parsed.success)return reply.code(400).send({error:'INVALID_PRICE_IMPORT_UPLOAD'});
+    const d=parsed.data;
+    let bytes;
+    try{bytes=Buffer.from(d.content_base64,'base64');}catch{return reply.code(400).send({error:'INVALID_PRICE_IMPORT_BASE64'});}
+    if(!bytes.length||bytes.length>22*1024*1024)return reply.code(413).send({error:'PRICE_IMPORT_FILE_SIZE_INVALID'});
+    const db=getDb();
+    try{
+      const result=await stageSupplierPriceBuffer(db,bytes,{source_name:d.source_name||d.filename,source_filename:d.filename,supplier_id:d.supplier_id??null,expected_checksum_sha256:d.expected_sha256||null,created_by_user_id:Number(request.user.sub)});
+      await audit(db,request,'supplier-price.upload','supplier_price_import',result.import_id,null,{checksum_sha256:result.checksum_sha256,row_count:result.row_count,category_count:result.category_count,idempotent:result.idempotent,automatic_apply:false});
+      return reply.code(result.idempotent?200:201).send(result);
+    }catch(error){
+      const message=String(error?.message||'');
+      if(message==='SUPPLIER_NOT_FOUND')return reply.code(404).send({error:message});
+      if(message.startsWith('PRICE_IMPORT_CHECKSUM_MISMATCH'))return reply.code(409).send({error:'PRICE_IMPORT_CHECKSUM_MISMATCH',actual_sha256:message.split(':')[1]||null});
+      if(message.startsWith('PRICE_SOURCE_')||message==='INVALID_EXPECTED_SHA256'||message==='INVALID_SUPPLIER_ID')return reply.code(400).send({error:message});
+      throw error;
+    }
+  });
 
   app.get('/api/v1/admin/supplier-prices/imports',{preHandler:staff},async()=>{
     const db=getDb();
