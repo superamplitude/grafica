@@ -12,6 +12,7 @@ coverage/
 dist/
 build/
 logs/
+runtime/
 *.log
 storage/private/
 storage/tmp/
