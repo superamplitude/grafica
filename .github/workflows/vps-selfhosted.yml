@@ -17,43 +17,53 @@ jobs:
     runs-on: [self-hosted, central-prints, vps, production]
     timeout-minutes: 10
     steps:
-      - name: Provar execucao dentro da VPS
+      - name: Diagnostico real da VPS como usuario do site
         shell: bash
         run: |
           set -Eeuo pipefail
-          echo "=== ID ==="
+          APP="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
+          echo "=== RUNNER ==="
           whoami
           id
           hostname
-          pwd
-          uname -a
           echo
-          echo "=== ACESSO AO APP ==="
-          APP="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
-          ls -ld /home/belastock-grafica /home/belastock-grafica/htdocs "$APP" || true
-          if [ -d "$APP/.git" ]; then
-            git -c safe.directory="$APP" -C "$APP" rev-parse --short HEAD || true
-            git -c safe.directory="$APP" -C "$APP" branch --show-current || true
-            git -c safe.directory="$APP" -C "$APP" status --short || true
-          fi
+          echo "=== PERMISSAO DELEGADA ==="
+          sudo -n -u belastock-grafica true
+          echo "SUDO_SITE_USER=OK"
           echo
-          echo "=== RUNTIME ==="
-          command -v node && node --version || true
-          command -v npm && npm --version || true
-          command -v pm2 && pm2 status || true
+          echo "=== APP ==="
+          sudo -n -u belastock-grafica -H bash -lc "cd '$APP' && printf 'PWD=' && pwd && printf 'HEAD=' && git -c safe.directory='$APP' rev-parse HEAD && printf 'BRANCH=' && git -c safe.directory='$APP' branch --show-current && echo 'STATUS_BEGIN' && git -c safe.directory='$APP' status --short && echo 'STATUS_END' && printf 'ORIGIN=' && git -c safe.directory='$APP' remote get-url origin"
           echo
-          echo "=== PORTAS ==="
-          ss -ltnp 2>/dev/null | grep -E ':(3005|3210)\\b' || true
+          echo "=== RUNTIME SITE USER ==="
+          sudo -n -u belastock-grafica -H bash -lc "node --version; npm --version; command -v pm2 || true; pm2 status || true"
           echo
-          echo "=== HEALTH ==="
-          curl -sS -i --max-time 5 http://127.0.0.1:3005/api/health || true
+          echo "=== ENV PRESENCE (SEM SEGREDOS) ==="
+          sudo -n -u belastock-grafica -H bash -lc "cd '$APP'; test -f .env && echo ENV_FILE=YES || echo ENV_FILE=NO; for k in DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD JWT_SECRET PORT; do if grep -qE \"^${k}=.+\" .env 2>/dev/null; then echo \"${k}=SET\"; else echo \"${k}=MISSING\"; fi; done"
           echo
-          echo "=== READY ==="
-          curl -sS -i --max-time 5 http://127.0.0.1:3005/api/ready || true
+          echo "=== RELEASE/HEALTH ==="
+          curl -fsS --max-time 5 http://127.0.0.1:3005/api/health
           echo
-          echo "=== SUDO NAO-INTERATIVO ==="
-          if sudo -n true 2>/dev/null; then
-            echo "SUDO_N=OK"
-          else
-            echo "SUDO_N=NO"
-          fi
+          curl -fsS --max-time 5 http://127.0.0.1:3005/api/ready
+          echo
+          curl -fsS --max-time 5 http://127.0.0.1:3005/api/release || true
+          echo
+          echo "=== DATABASE COUNTS (SEM CREDENCIAIS) ==="
+          sudo -n -u belastock-grafica -H bash -lc "cd '$APP' && node --input-type=module <<'NODE'
+import 'dotenv/config';
+import mysql from 'mysql2/promise';
+const db = await mysql.createConnection({
+  host: process.env.DB_HOST || '127.0.0.1',
+  port: Number(process.env.DB_PORT || 3306),
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
+});
+const [tables] = await db.query('SHOW TABLES');
+const names = new Set(tables.map(r => Object.values(r)[0]));
+for (const table of ['products','product_variants','categories','staff_users','supplier_price_imports','supplier_price_rows','media_assets','media_asset_reviews']) {
+  if (!names.has(table)) { console.log(`${table}=MISSING_TABLE`); continue; }
+  const [rows] = await db.query(`SELECT COUNT(*) AS c FROM \\`${table}\\``);
+  console.log(`${table}=${rows[0].c}`);
+}
+await db.end();
+NODE"
