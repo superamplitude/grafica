@@ -11,7 +11,7 @@ const requiredColumns={
   media_asset_reviews:['media_id','usage_type','photo_type','supplier_branding','price_text','license_status','review_status','reviewed_by_user_id','reviewed_at'],
   external_reference_assets:['provider','external_id','external_url','source_type','source_group','title','mime_type','supplier_hint','usage_hint','photo_type_hint','supplier_branding_risk','price_text_risk','license_status','ingestion_status','review_required','metadata_json','imported_media_id'],
   supplier_price_imports:['supplier_id','source_name','source_filename','source_checksum_sha256','source_date','source_format','status','row_count','category_count','matched_count','conflict_count','metadata_json','reviewed_by_user_id','reviewed_at','applied_at'],
-  supplier_price_rows:['import_id','row_number','source_code','category_name','service_description','color_configuration','weight_value','quantity_value','size_label','production_days','supplier_price','matched_variant_id','match_status','review_status','raw_json'],
+  supplier_price_rows:['import_id','source_row_number','source_code','category_name','service_description','color_configuration','weight_value','quantity_value','size_label','production_days','supplier_price','matched_variant_id','match_status','review_status','raw_json'],
   commerce_integrations:['integration_type','provider_code','display_name','integration_mode','adapter_status','status','capabilities_json','config_json','secret_env_json','verified_at','verified_by_user_id'],
   orders:['payment_status','payment_provider','paid_total'],
   artworks:['superseded_at'],
