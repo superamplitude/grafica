@@ -1,8 +1,9 @@
 const token=sessionStorage.getItem('cp-admin-token')||'';
-const esc=(v='')=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const esc=(v='')=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 let user=null;
 let integrations=[];
 let assets=[];
+let externalRefs=[];
 let selectedAsset=null;
 
 async function api(url,options={}){
@@ -14,7 +15,7 @@ async function api(url,options={}){
 }
 
 function chip(value){
-  const cls=['active','verified','approved','clear','owned','licensed'].includes(value)?'good':['blocked','rejected','found'].includes(value)?'bad':'warn';
+  const cls=['active','verified','approved','clear','owned','licensed','reviewed','imported'].includes(value)?'good':['blocked','rejected','found'].includes(value)?'bad':'warn';
   return `<span class="chip ${cls}">${esc(value||'—')}</span>`;
 }
 
@@ -59,6 +60,26 @@ async function verifyIntegration(id){
   if(note===null)return;
   try{await api(`/api/v1/admin/commerce/integrations/${id}/verification`,{method:'POST',body:JSON.stringify({result:'verified',note})});await loadIntegrations();}
   catch(error){alert(`Não foi possível homologar: ${error.message}`);}
+}
+
+function externalCard(row){
+  const file=row.source_type==='file';
+  return `<article class="reference-card">
+    <div class="reference-icon">${file?'ARQ':'PASTA'}</div>
+    <div class="reference-body"><strong title="${esc(row.title)}">${esc(row.title)}</strong><small>${esc(row.source_group||'sem grupo')} · ${esc(row.provider)}</small><div class="integration-meta">${chip(row.ingestion_status)}${chip(row.usage_hint)}${chip(row.photo_type_hint)}${chip(row.supplier_branding_risk)}${chip(row.license_status)}</div><p>${row.supplier_branding_risk==='found'?'Bloqueado por possível marca do fornecedor.':'Mantido em quarentena até inspeção e direito de uso.'}</p><a href="${esc(row.external_url)}" target="_blank" rel="noopener noreferrer">Abrir referência</a></div>
+  </article>`;
+}
+
+async function loadExternalRefs(){
+  const q=new URLSearchParams();
+  const usage=document.querySelector('#externalUsage').value;
+  const branding=document.querySelector('#externalBranding').value;
+  if(usage)q.set('usage',usage);if(branding)q.set('branding',branding);
+  const data=await api(`/api/v1/admin/assets/external-references${q.size?`?${q}`:''}`);
+  externalRefs=data.items||[];
+  const summary=data.summary||{};
+  document.querySelector('#externalSummary').innerHTML=`<strong>${externalRefs.length}</strong> exibidos · <span>quarentena ${Number(summary.quarantined||0)}</span> · <span>revisados ${Number(summary.reviewed||0)}</span> · <span>importados ${Number(summary.imported||0)}</span>`;
+  document.querySelector('#externalGrid').innerHTML=externalRefs.length?externalRefs.map(externalCard).join(''):'<div class="empty-state">Nenhuma referência externa para este filtro.</div>';
 }
 
 function assetCard(row){
@@ -116,6 +137,9 @@ document.addEventListener('click',event=>{
   const asset=event.target.closest('[data-open-asset]');if(asset)openAsset(asset.dataset.openAsset);
 });
 document.querySelector('#reloadCommerce').addEventListener('click',loadIntegrations);
+document.querySelector('#reloadExternal').addEventListener('click',loadExternalRefs);
+document.querySelector('#externalUsage').addEventListener('change',loadExternalRefs);
+document.querySelector('#externalBranding').addEventListener('change',loadExternalRefs);
 document.querySelector('#reloadAssets').addEventListener('click',loadAssets);
 document.querySelector('#assetKind').addEventListener('change',loadAssets);
 document.querySelector('#assetStatus').addEventListener('change',loadAssets);
@@ -126,5 +150,5 @@ try{
   const me=await api('/api/v1/admin/auth/me');user=me.user;
   document.querySelector('#integrationUser').textContent=user.name||user.email;
   document.querySelector('#integrationRole').textContent=user.role;
-  await Promise.all([loadIntegrations(),loadAssets()]);
+  await Promise.all([loadIntegrations(),loadExternalRefs(),loadAssets()]);
 }catch{location.href='/admin/';}
