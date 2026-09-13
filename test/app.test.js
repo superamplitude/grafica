@@ -24,6 +24,8 @@ for (const [url, marker] of [
   ['/admin/', /Super Admin/i],
   ['/admin/catalogo.html', /Editor de Catálogo/i],
   ['/admin/site.html', /Editor do Site/i],
+  ['/admin/gabaritos.html', /Gabaritos/i],
+  ['/admin/integracoes.html', /Integrações e Ativos/i],
   ['/admin/pedidos.html', /Pedidos/i],
   ['/admin/prepress.html', /Pré-impressão/i],
   ['/admin/finalizacao.html', /Finalização e Publicação/i]
