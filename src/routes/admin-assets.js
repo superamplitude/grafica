@@ -78,6 +78,29 @@ export async function registerAdminAssetRoutes(app) {
     return { items: rows.map((row)=>({ ...row, url:publicObjectUrl(row.object_key) })) };
   });
 
+  app.get('/api/v1/admin/assets/external-references', { preHandler: staff }, async (request) => {
+    const db = getDb();
+    const status = String(request.query?.status || '').trim();
+    const usage = String(request.query?.usage || '').trim();
+    const risk = String(request.query?.branding || '').trim();
+    const where=[];
+    const params=[];
+    if(['discovered','quarantined','reviewed','imported','rejected'].includes(status)){where.push('ingestion_status=?');params.push(status);}
+    if(['product','hero','template','reference','unknown'].includes(usage)){where.push('usage_hint=?');params.push(usage);}
+    if(['clear','found','unknown'].includes(risk)){where.push('supplier_branding_risk=?');params.push(risk);}
+    const [rows]=await db.execute(`
+      SELECT id,provider,external_id,external_url,source_type,source_group,title,mime_type,supplier_hint,
+             usage_hint,photo_type_hint,supplier_branding_risk,price_text_risk,license_status,ingestion_status,
+             review_required,imported_media_id,discovered_at,reviewed_at,created_at,updated_at
+        FROM external_reference_assets
+       ${where.length?`WHERE ${where.join(' AND ')}`:''}
+       ORDER BY supplier_branding_risk='found' DESC,source_group,title,id
+       LIMIT 1000
+    `,params);
+    const [summaryRows]=await db.query(`SELECT ingestion_status,COUNT(*) AS n FROM external_reference_assets GROUP BY ingestion_status`);
+    return {items:rows,summary:Object.fromEntries(summaryRows.map(r=>[r.ingestion_status,Number(r.n||0)]))};
+  });
+
   app.get('/api/v1/admin/media/:id/review', { preHandler: staff }, async (request, reply) => {
     const db = getDb();
     const mediaId = Number(request.params.id);
