@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dbStatus } from './lib/db.js';
 import { r2Status } from './lib/storage.js';
+import { readReleaseStatus } from './lib/release.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerPriceTableRoutes } from './routes/price-table.js';
@@ -64,6 +65,12 @@ export async function buildApp() {
       timestamp:new Date().toISOString()
     });
   });
+
+  app.get('/api/release', async () => ({
+    service:'central-prints-node',
+    version:VERSION,
+    release:await readReleaseStatus()
+  }));
   app.get('/api',async()=>({name:'Central Prints API',version:VERSION}));
 
   await registerPublicRoutes(app);
