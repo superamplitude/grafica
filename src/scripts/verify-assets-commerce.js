@@ -47,13 +47,21 @@ async function insertMedia(kind, objectKey, originalName, mimeType) {
 
 const photoKey = `products/photos/ci/${id}.jpg`;
 const photoId = await insertMedia('product-photo',photoKey,`${id}.jpg`,'image/jpeg');
-await db.execute(`INSERT INTO product_media (product_id,media_id,role,sort_order) VALUES (?,?,'cover',0)`,[productId,photoId]);
 
 const app = await buildApp();
 await app.ready();
+const adminToken = app.jwt.sign({sub:'999999',jti:crypto.randomUUID(),role:'super_admin',email:'ci@centralprints.invalid',name:'CI'});
+let response = await app.inject({
+  method:'POST',
+  url:`/api/v1/admin/catalog/products/${productId}/media`,
+  headers:{authorization:`Bearer ${adminToken}`},
+  payload:{media_id:photoId,role:'cover',sort_order:0}
+});
+assert.equal(response.statusCode,201,'fluxo administrativo deve vincular foto ao produto');
+assert.equal(response.json().reviewRequired,true,'foto nova deve exigir auditoria');
 
 const listUrl = `/api/v1/products?q=${encodeURIComponent(label)}&limit=10`;
-let response = await app.inject({method:'GET',url:listUrl});
+response = await app.inject({method:'GET',url:listUrl});
 assert.equal(response.statusCode,200);
 let payload = response.json();
 assert.equal(payload.items.length,1);
@@ -128,4 +136,4 @@ assert.equal(JSON.stringify(payload).includes('secret_env'),false,'metadados int
 
 await app.close();
 await db.end();
-console.log(JSON.stringify({ok:true,productId,bannerId,verified:['real-product-photo','price-free-hero','neutral-template','commerce-public-filter','supplier-hidden']}));
+console.log(JSON.stringify({ok:true,productId,bannerId,verified:['admin-product-photo-attach','real-product-photo','price-free-hero','neutral-template','commerce-public-filter','supplier-hidden']}));
