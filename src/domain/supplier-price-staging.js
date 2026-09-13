@@ -18,7 +18,7 @@ export async function stageSupplierPriceBuffer(db,buffer,options={}){
     const sourceName=String(options.source_name||sourceFilename).slice(0,255);
     const [result]=await conn.execute(`INSERT INTO supplier_price_imports
       (supplier_id,source_name,source_filename,source_checksum_sha256,source_date,source_format,status,row_count,category_count,metadata_json,created_by_user_id)
-      VALUES (?,?,?,?,?,'html_xls','staged',?,?,?,?,?)`,[
+      VALUES (?,?,?,?,?,'html_xls','staged',?,?,?,?)`,[
         supplierId,sourceName,path.basename(sourceFilename),parsed.checksum_sha256,parsed.source_date,parsed.row_count,parsed.category_count,
         JSON.stringify({source_size_bytes:Buffer.byteLength(buffer),parser:'html_xls_v1',automatic_apply:false,checksum_locked:Boolean(expectedChecksum)}),options.created_by_user_id??null
       ]);
