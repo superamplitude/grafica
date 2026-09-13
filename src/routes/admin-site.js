@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { getDb } from '../lib/db.js';
 import { publicObjectUrl } from '../lib/storage.js';
+import { heroTextHasPricing } from '../domain/hero-policy.js';
 
 const bannerSchema = z.object({
   name: z.string().min(2).max(190),
@@ -36,12 +37,6 @@ function dbDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return undefined;
   return date.toISOString().slice(0, 19).replace('T', ' ');
-}
-
-function heroTextHasPricing(data = {}) {
-  const text = [data.eyebrow,data.title,data.body,data.cta_label,data.secondary_cta_label].filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-  if (!text) return false;
-  return /r\$\s*\d|\bpre[cç]o\b|\ba partir de\b|\bpor apenas\b|\bde\s+r\$|\d+[.,]\d{2}(?:\s|$)|\b\d+\s*%\s*(?:off|de desconto)\b/i.test(text);
 }
 
 async function validateBannerMedia(db, ids) {
