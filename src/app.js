@@ -19,6 +19,7 @@ import { registerAdminOrderRoutes } from './routes/admin-orders.js';
 import { registerAdminPrepressRoutes } from './routes/admin-prepress.js';
 import { registerAdminLaunchRoutes } from './routes/admin-launch.js';
 import { registerAdminCatalogRoutes } from './routes/admin-catalog.js';
+import { registerAdminSupplierImportRoutes } from './routes/admin-supplier-imports.js';
 import { registerAdminSiteRoutes } from './routes/admin-site.js';
 import { registerAdminAssetRoutes } from './routes/admin-assets.js';
 import { registerAdminProductMediaRoutes } from './routes/admin-product-media.js';
@@ -87,6 +88,7 @@ export async function buildApp() {
   await registerAdminPrepressRoutes(app);
   await registerAdminLaunchRoutes(app);
   await registerAdminCatalogRoutes(app);
+  await registerAdminSupplierImportRoutes(app);
   await registerAdminSiteRoutes(app);
   await registerAdminAssetRoutes(app);
   await registerAdminProductMediaRoutes(app);
