@@ -80,7 +80,7 @@ await db.execute(`
 `,[bannerMediaId]);
 const [bannerResult] = await db.execute(`
   INSERT INTO banners (name,placement,desktop_media_id,eyebrow,title,body,cta_label,cta_url,sort_order,status)
-  VALUES (?,'home-hero',?,'Impressão profissional',?,'Imagem limpa sem preço ou marca de fornecedor.','Ver catálogo','/catalogo.html',999,'active')
+  VALUES (?,'home-hero',?,'Impressão profissional',?,'Imagem limpa sem preço ou marca de fornecedor.','Ver catálogo','/catalogo.html',-999,'active')
 `,[`Hero ${label}`,bannerMediaId,`Sua gráfica ${label}`]);
 const bannerId = Number(bannerResult.insertId);
 
