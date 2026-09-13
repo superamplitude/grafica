@@ -112,6 +112,30 @@ echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"
 grep -qi 'Central Prints' "$BACKUP_DIR/public.html" || fail "Home publica sem identidade esperada."
 grep -qi 'Catálogo Central Prints' "$BACKUP_DIR/public-catalog.html" || fail "Catalogo publico sem conteudo esperado."
 
+log "Registrando evidencia atomica da release"
+mkdir -p runtime
+node - "$NEW_HEAD" "$APP_PORT" "$HEALTH" "$READY" "$PUBLIC" "$PUBLIC_CATALOG" <<'NODE'
+const fs=require('node:fs');
+const path=require('node:path');
+const [, , commit, port, health, ready, publicHttp, catalog]=process.argv;
+const dir=path.join(process.cwd(),'runtime');
+const target=path.join(dir,'deploy-status.json');
+const tmp=path.join(dir,`.deploy-status-${process.pid}.json`);
+const payload={
+  commit,
+  deployedAt:new Date().toISOString(),
+  port:Number(port),
+  health:Number(health),
+  ready:Number(ready),
+  public:Number(publicHttp),
+  catalog:Number(catalog)
+};
+fs.writeFileSync(tmp,JSON.stringify(payload,null,2)+'\n',{mode:0o644});
+fs.renameSync(tmp,target);
+NODE
+chmod 644 runtime/deploy-status.json
+cp -a runtime/deploy-status.json "$BACKUP_DIR/deploy-status.json"
+
 pm2 save
 trap - ERR
 
@@ -125,8 +149,12 @@ echo "HOME=https://$DOMAIN/"
 echo "CATALOGO=https://$DOMAIN/catalogo.html"
 echo "ADMIN=https://$DOMAIN/admin/"
 echo "EDITOR=https://$DOMAIN/admin/catalogo.html"
+echo "IMAGENS=https://$DOMAIN/admin/imagens.html"
+echo "GABARITOS=https://$DOMAIN/admin/gabaritos.html"
+echo "INTEGRACOES=https://$DOMAIN/admin/integracoes.html"
 echo "PEDIDOS=https://$DOMAIN/admin/pedidos.html"
 echo "PREPRESS=https://$DOMAIN/admin/prepress.html"
+echo "RELEASE=https://$DOMAIN/api/release"
 echo "HEALTH_HTTP=$HEALTH"
 echo "READY_HTTP=$READY"
 echo "PUBLIC_HTTP=$PUBLIC"
