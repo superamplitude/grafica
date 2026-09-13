@@ -11,7 +11,6 @@ export async function stageSupplierPriceBuffer(db,buffer,options={}){
   if(supplierId){const [supplierRows]=await db.execute('SELECT id FROM suppliers WHERE id=? LIMIT 1',[supplierId]);if(!supplierRows.length)throw new Error('SUPPLIER_NOT_FOUND');}
   const [existing]=await db.execute('SELECT id,status,row_count,category_count,matched_count,conflict_count FROM supplier_price_imports WHERE source_checksum_sha256=? LIMIT 1',[parsed.checksum_sha256]);
   if(existing[0])return {ok:true,idempotent:true,import_id:Number(existing[0].id),checksum_sha256:parsed.checksum_sha256,row_count:Number(existing[0].row_count),category_count:Number(existing[0].category_count),matched_count:Number(existing[0].matched_count||0),conflict_count:Number(existing[0].conflict_count||0),status:existing[0].status,automatic_apply:false};
-
   const conn=await db.getConnection();
   try{
     await conn.beginTransaction();
@@ -21,8 +20,7 @@ export async function stageSupplierPriceBuffer(db,buffer,options={}){
       (supplier_id,source_name,source_filename,source_checksum_sha256,source_date,source_format,status,row_count,category_count,metadata_json,created_by_user_id)
       VALUES (?,?,?,?,?,'html_xls','staged',?,?,?,?,?)`,[
         supplierId,sourceName,path.basename(sourceFilename),parsed.checksum_sha256,parsed.source_date,parsed.row_count,parsed.category_count,
-        JSON.stringify({source_size_bytes:Buffer.byteLength(buffer),parser:'html_xls_v1',automatic_apply:false,checksum_locked:Boolean(expectedChecksum)}),
-        options.created_by_user_id??null
+        JSON.stringify({source_size_bytes:Buffer.byteLength(buffer),parser:'html_xls_v1',automatic_apply:false,checksum_locked:Boolean(expectedChecksum)}),options.created_by_user_id??null
       ]);
     const importId=Number(result.insertId);
     const batchSize=300;
@@ -32,7 +30,7 @@ export async function stageSupplierPriceBuffer(db,buffer,options={}){
       const values=[];
       for(const row of batch)values.push(importId,row.row_number,row.source_code,row.category_name,row.service_description,row.color_configuration,row.weight_value,row.quantity_value,row.size_label,row.production_days,row.supplier_price,'unmatched',JSON.stringify(row.raw_json));
       await conn.query(`INSERT INTO supplier_price_rows
-        (import_id,row_number,source_code,category_name,service_description,color_configuration,weight_value,quantity_value,size_label,production_days,supplier_price,match_status,raw_json)
+        (import_id,source_row_number,source_code,category_name,service_description,color_configuration,weight_value,quantity_value,size_label,production_days,supplier_price,match_status,raw_json)
         VALUES ${placeholders}`,values);
     }
     await conn.execute(`UPDATE supplier_price_rows r JOIN product_variants v ON v.external_code=r.source_code SET r.matched_variant_id=v.id,r.match_status='exact' WHERE r.import_id=?`,[importId]);
