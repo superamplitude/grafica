@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS supplier_price_imports (
 CREATE TABLE IF NOT EXISTS supplier_price_rows (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   import_id BIGINT UNSIGNED NOT NULL,
-  row_number INT UNSIGNED NOT NULL,
+  source_row_number INT UNSIGNED NOT NULL,
   source_code VARCHAR(190) NOT NULL,
   category_name VARCHAR(255) NOT NULL,
   service_description TEXT NOT NULL,
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS supplier_price_rows (
   raw_json JSON NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_supplier_price_import_row (import_id,row_number),
+  UNIQUE KEY uq_supplier_price_import_row (import_id,source_row_number),
   UNIQUE KEY uq_supplier_price_import_code (import_id,source_code),
   KEY idx_supplier_price_row_match (import_id,match_status),
   KEY idx_supplier_price_row_review (import_id,review_status),
