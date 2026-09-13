@@ -6,7 +6,6 @@ ENV_FILE="$APP_DIR/.env"
 BACKUP_ROOT="/home/belastock-grafica/backups"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="$BACKUP_ROOT/r2_bootstrap_$STAMP"
-APP_PORT="3005"
 
 fail(){ echo "[ERRO] $*" >&2; exit 1; }
 log(){ printf '\n[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
@@ -28,17 +27,20 @@ git rev-parse HEAD > "$BACKUP_DIR/git-head.txt"
 ACCOUNT_ID="$(read_env R2_ACCOUNT_ID)"
 ACCESS_KEY="$(read_env R2_ACCESS_KEY_ID)"
 SECRET_KEY="$(read_env R2_SECRET_ACCESS_KEY)"
-PUBLIC_BUCKET="$(read_env R2_PUBLIC_BUCKET)"; PUBLIC_BUCKET="${PUBLIC_BUCKET:-central-prints-public}"
-PRIVATE_BUCKET="$(read_env R2_PRIVATE_BUCKET)"; PRIVATE_BUCKET="${PRIVATE_BUCKET:-central-prints-private}"
+PUBLIC_BUCKET="$(read_env R2_PUBLIC_BUCKET)"; PUBLIC_BUCKET="${PUBLIC_BUCKET:-grafica}"
+PRIVATE_BUCKET="$(read_env R2_PRIVATE_BUCKET)"; PRIVATE_BUCKET="${PRIVATE_BUCKET:-grafica-private}"
 PUBLIC_BASE="$(read_env R2_PUBLIC_BASE_URL)"
+APP_PORT="$(read_env PORT)"; APP_PORT="${APP_PORT:-3005}"
 
 if [ -z "$ACCOUNT_ID" ]; then read -r -p "Cloudflare Account ID: " ACCOUNT_ID; fi
 if [ -z "$ACCESS_KEY" ]; then read -r -p "R2 Access Key ID: " ACCESS_KEY; fi
 if [ -z "$SECRET_KEY" ]; then read -r -s -p "R2 Secret Access Key: " SECRET_KEY; echo; fi
-read -r -p "Bucket PUBLICO [$PUBLIC_BUCKET]: " input_public; PUBLIC_BUCKET="${input_public:-$PUBLIC_BUCKET}"
-read -r -p "Bucket PRIVADO [$PRIVATE_BUCKET]: " input_private; PRIVATE_BUCKET="${input_private:-$PRIVATE_BUCKET}"
+if [ "${R2_EDIT_BUCKETS:-0}" = "1" ]; then
+  read -r -p "Bucket PUBLICO [$PUBLIC_BUCKET]: " input_public; PUBLIC_BUCKET="${input_public:-$PUBLIC_BUCKET}"
+  read -r -p "Bucket PRIVADO [$PRIVATE_BUCKET]: " input_private; PRIVATE_BUCKET="${input_private:-$PRIVATE_BUCKET}"
+fi
 if [ -z "$PUBLIC_BASE" ]; then
-  read -r -p "URL publica do bucket (custom domain; Enter para configurar depois): " PUBLIC_BASE
+  read -r -p "URL publica do bucket grafica (r2.dev ou dominio proprio): " PUBLIC_BASE
 fi
 
 [ -n "$ACCOUNT_ID" ] || fail "R2_ACCOUNT_ID vazio."
@@ -47,8 +49,10 @@ fi
 [[ "$PUBLIC_BUCKET" =~ ^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$ ]] || fail "Nome do bucket publico invalido."
 [[ "$PRIVATE_BUCKET" =~ ^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$ ]] || fail "Nome do bucket privado invalido."
 [ "$PUBLIC_BUCKET" != "$PRIVATE_BUCKET" ] || fail "Buckets publico e privado precisam ser diferentes."
+[[ "$PUBLIC_BASE" =~ ^https://[^[:space:]]+$ ]] || fail "R2_PUBLIC_BASE_URL deve ser uma URL HTTPS publica do bucket."
+[[ "$APP_PORT" =~ ^[0-9]+$ ]] && [ "$APP_PORT" -ge 1 ] && [ "$APP_PORT" -le 65535 ] || fail "PORT invalida no .env."
 
-log "Persistindo credenciais R2 somente no .env local"
+log "Persistindo credenciais e layout R2 somente no .env local"
 python3 - "$ENV_FILE" "$ACCOUNT_ID" "$ACCESS_KEY" "$SECRET_KEY" "$PUBLIC_BUCKET" "$PRIVATE_BUCKET" "$PUBLIC_BASE" <<'PY'
 from pathlib import Path
 import sys
@@ -60,7 +64,7 @@ vals={
  'R2_SECRET_ACCESS_KEY':sys.argv[4],
  'R2_PUBLIC_BUCKET':sys.argv[5],
  'R2_PRIVATE_BUCKET':sys.argv[6],
- 'R2_PUBLIC_BASE_URL':sys.argv[7],
+ 'R2_PUBLIC_BASE_URL':sys.argv[7].rstrip('/'),
 }
 lines=path.read_text().splitlines(); seen=set(); out=[]
 for line in lines:
@@ -77,13 +81,13 @@ path.write_text('\n'.join(out)+'\n')
 PY
 chmod 600 "$ENV_FILE"
 
-log "Criando/validando buckets separados e aplicando CORS"
+log "Criando/validando bucket privado, validando bucket publico e aplicando CORS"
 npm run r2:bootstrap
 
-log "Prova real de armazenamento R2"
+log "Prova real de armazenamento R2 publico + privado + URL publica"
 npm run r2:verify
 
-log "Tornando R2 requisito de readiness somente apos a prova"
+log "Tornando R2 requisito de readiness somente apos a prova completa"
 python3 - "$ENV_FILE" <<'PY'
 from pathlib import Path
 import sys
@@ -119,12 +123,8 @@ PUBLIC="$(curl -kLsS --max-redirs 5 --max-time 20 -o /dev/null -w '%{http_code}'
 log "R2 pronto"
 echo "PUBLIC_BUCKET=$PUBLIC_BUCKET"
 echo "PRIVATE_BUCKET=$PRIVATE_BUCKET"
+echo "PUBLIC_CDN=${PUBLIC_BASE%/}"
 echo "HEALTH_HTTP=$HEALTH"
 echo "READY_HTTP=$READY"
 echo "PUBLIC_HTTP=$PUBLIC"
-if [ -n "$PUBLIC_BASE" ]; then
-  echo "PUBLIC_CDN=$PUBLIC_BASE"
-else
-  echo "PUBLIC_CDN_PENDING=yes"
-fi
 echo "BACKUP_DIR=$BACKUP_DIR"
