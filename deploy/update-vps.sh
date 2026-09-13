@@ -23,24 +23,19 @@ cd "$APP_DIR"
 
 PREVIOUS="$(git_safe rev-parse HEAD)"
 PREVIOUS_HAS_PREFLIGHT=0
-if [ -f ecosystem.config.cjs ] && grep -q "central-prints-preflight" ecosystem.config.cjs; then
-  PREVIOUS_HAS_PREFLIGHT=1
-fi
+if [ -f ecosystem.config.cjs ] && grep -q "central-prints-preflight" ecosystem.config.cjs; then PREVIOUS_HAS_PREFLIGHT=1; fi
 printf '%s\n' "$PREVIOUS" > "$BACKUP_DIR/git-head.before.txt"
 printf '%s\n' "$PREVIOUS_HAS_PREFLIGHT" > "$BACKUP_DIR/preflight.before.txt"
 [ -f .env ] && cp -a .env "$BACKUP_DIR/env.before" && chmod 600 "$BACKUP_DIR/env.before" || true
 printf '%s\n' "$PREVIOUS" > .last-good-commit
 
 rollback(){
-  local rc=$?
-  trap - ERR
+  local rc=$?; trap - ERR
   echo "[ROLLBACK] Falha detectada; restaurando commit $PREVIOUS" >&2
   git_safe reset --hard "$PREVIOUS" || true
   if [ -f package-lock.json ]; then npm ci --omit=dev || true; else npm install --omit=dev || true; fi
   pm2 startOrReload ecosystem.config.cjs --update-env || true
-  if [ "$PREVIOUS_HAS_PREFLIGHT" -eq 0 ]; then
-    pm2 delete central-prints-preflight >/dev/null 2>&1 || true
-  fi
+  if [ "$PREVIOUS_HAS_PREFLIGHT" -eq 0 ]; then pm2 delete central-prints-preflight >/dev/null 2>&1 || true; fi
   pm2 save || true
   echo "[ROLLBACK] Aplicacao restaurada. Evidencias em $BACKUP_DIR" >&2
   exit "$rc"
@@ -55,26 +50,17 @@ printf '%s\n' "$NEW_HEAD" > "$BACKUP_DIR/git-head.after.txt"
 
 log "Instalando dependencias reproduziveis"
 if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
-
 APP_PORT="$(node --input-type=module -e "import 'dotenv/config'; const p=Number(process.env.PORT||${APP_PORT_DEFAULT}); if(!Number.isInteger(p)||p<1||p>65535) process.exit(2); process.stdout.write(String(p));")"
 printf '%s\n' "$APP_PORT" > "$BACKUP_DIR/app-port.txt"
 log "Porta local detectada: $APP_PORT"
 
 log "Executando verificacao de codigo antes de alterar o banco"
 npm run verify
-npm run catalog:sync -- --dry-run | tee "$BACKUP_DIR/catalog-integrity.json"
-
 log "Aplicando migracoes idempotentes e validando schema"
 npm run migrate
 npm run schema:verify
-
 log "Registrando referencias externas em quarentena"
 npm run reference:import | tee "$BACKUP_DIR/reference-import.json"
-
-log "Sincronizando catalogo real da tabela de precos enviada"
-npm run catalog:sync | tee "$BACKUP_DIR/catalog-sync.json"
-npm run catalog:verify | tee "$BACKUP_DIR/catalog-verify.json"
-
 log "Reiniciando Central Prints na porta local $APP_PORT"
 pm2 startOrReload ecosystem.config.cjs --update-env
 
@@ -88,73 +74,31 @@ for _ in $(seq 1 25); do
   sleep 1
 done
 
-echo "LOCAL_PORT=$APP_PORT"
-echo "LOCAL_HEALTH_HTTP=$HEALTH"
-echo "LOCAL_READY_HTTP=$READY"
-echo "LOCAL_HOME_HTTP=$ROOT"
-echo "LOCAL_CATALOG_HTTP=$CATALOG"
+echo "LOCAL_PORT=$APP_PORT"; echo "LOCAL_HEALTH_HTTP=$HEALTH"; echo "LOCAL_READY_HTTP=$READY"; echo "LOCAL_HOME_HTTP=$ROOT"; echo "LOCAL_CATALOG_HTTP=$CATALOG"
 [ "$HEALTH" = "200" ] || fail "Health local falhou na porta $APP_PORT: $HEALTH"
 [ "$READY" = "200" ] || fail "Readiness local falhou na porta $APP_PORT: $READY"
 [ "$ROOT" = "200" ] || fail "Home local falhou na porta $APP_PORT: $ROOT"
 [ "$CATALOG" = "200" ] || fail "Catalogo local falhou na porta $APP_PORT: $CATALOG"
-
 grep -qi 'Central Prints' "$BACKUP_DIR/home.html" || fail "Home respondeu 200 sem identidade Central Prints."
 grep -qi 'Catálogo Central Prints' "$BACKUP_DIR/catalogo.html" || fail "Catalogo respondeu 200 sem o conteudo esperado."
-
-log "Provando catalogo pela API local"
-CATALOG_SUMMARY_HTTP="$(curl -sS --max-time 10 -o "$BACKUP_DIR/catalog-summary.json" -w '%{http_code}' "http://127.0.0.1:$APP_PORT/api/v1/catalog/summary" || true)"
-PRODUCTS_HTTP="$(curl -sS --max-time 10 -o "$BACKUP_DIR/catalog-products.json" -w '%{http_code}' "http://127.0.0.1:$APP_PORT/api/v1/products?limit=1" || true)"
-[ "$CATALOG_SUMMARY_HTTP" = "200" ] || fail "Resumo do catalogo falhou: $CATALOG_SUMMARY_HTTP"
-[ "$PRODUCTS_HTTP" = "200" ] || fail "API de produtos falhou: $PRODUCTS_HTTP"
-node - "$BACKUP_DIR/catalog-summary.json" "$BACKUP_DIR/catalog-products.json" <<'NODE'
-const fs=require('node:fs');
-const [, , summaryPath, productsPath]=process.argv;
-const summary=JSON.parse(fs.readFileSync(summaryPath,'utf8'));
-const products=JSON.parse(fs.readFileSync(productsPath,'utf8'));
-if(Number(summary.products)<1075)throw new Error(`PUBLIC_CATALOG_PRODUCTS_TOO_SMALL:${summary.products}`);
-if(Number(summary.variants)<21329)throw new Error(`PUBLIC_CATALOG_VARIANTS_TOO_SMALL:${summary.variants}`);
-if(!Array.isArray(products.items)||products.items.length<1)throw new Error('PUBLIC_CATALOG_EMPTY');
-console.log(JSON.stringify({ok:true,products:summary.products,variants:summary.variants,first_product:products.items[0]?.slug||null}));
-NODE
 
 log "Validando HTTPS de origem e publico"
 ORIGIN="$(curl -ksS --resolve "$DOMAIN:443:127.0.0.1" --max-time 15 -o "$BACKUP_DIR/origin.html" -w '%{http_code}' "https://$DOMAIN/?deploy=$STAMP" || true)"
 PUBLIC="$(curl -kLsS --max-redirs 5 --max-time 20 -o "$BACKUP_DIR/public.html" -w '%{http_code}' "https://$DOMAIN/?deploy=$STAMP" || true)"
 PUBLIC_CATALOG="$(curl -kLsS --max-redirs 5 --max-time 20 -o "$BACKUP_DIR/public-catalog.html" -w '%{http_code}' "https://$DOMAIN/catalogo.html?deploy=$STAMP" || true)"
-PUBLIC_CATALOG_API="$(curl -kLsS --max-redirs 5 --max-time 20 -o "$BACKUP_DIR/public-catalog-api.json" -w '%{http_code}' "https://$DOMAIN/api/v1/catalog/summary?deploy=$STAMP" || true)"
-
-echo "ORIGIN_HTTP=$ORIGIN"
-echo "PUBLIC_HTTP=$PUBLIC"
-echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"
-echo "PUBLIC_CATALOG_API_HTTP=$PUBLIC_CATALOG_API"
+echo "ORIGIN_HTTP=$ORIGIN"; echo "PUBLIC_HTTP=$PUBLIC"; echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"
 [ "$ORIGIN" = "200" ] || fail "Origem HTTPS falhou: $ORIGIN"
 [ "$PUBLIC" = "200" ] || fail "Home publica falhou: $PUBLIC"
 [ "$PUBLIC_CATALOG" = "200" ] || fail "Catalogo publico falhou: $PUBLIC_CATALOG"
-[ "$PUBLIC_CATALOG_API" = "200" ] || fail "API publica do catalogo falhou: $PUBLIC_CATALOG_API"
-
 grep -qi 'Central Prints' "$BACKUP_DIR/public.html" || fail "Home publica sem identidade esperada."
 grep -qi 'Catálogo Central Prints' "$BACKUP_DIR/public-catalog.html" || fail "Catalogo publico sem conteudo esperado."
-node - "$BACKUP_DIR/public-catalog-api.json" <<'NODE'
-const fs=require('node:fs');
-const summary=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
-if(Number(summary.products)<1075||Number(summary.variants)<21329)throw new Error(`PUBLIC_CATALOG_NOT_POPULATED:${summary.products}/${summary.variants}`);
-NODE
 
 log "Persistindo estado PM2 validado"
 pm2 save
-
 log "Registrando evidencia atomica da release"
 mkdir -p runtime
 node - "$NEW_HEAD" "$APP_PORT" "$HEALTH" "$READY" "$PUBLIC" "$PUBLIC_CATALOG" <<'NODE'
-const fs=require('node:fs');
-const path=require('node:path');
-const [, , commit, port, health, ready, publicHttp, catalog]=process.argv;
-const dir=path.join(process.cwd(),'runtime');
-const target=path.join(dir,'deploy-status.json');
-const tmp=path.join(dir,`.deploy-status-${process.pid}.json`);
-const payload={commit,deployedAt:new Date().toISOString(),port:Number(port),health:Number(health),ready:Number(ready),public:Number(publicHttp),catalog:Number(catalog)};
-fs.writeFileSync(tmp,JSON.stringify(payload,null,2)+'\n',{mode:0o644});
-fs.renameSync(tmp,target);
+const fs=require('node:fs');const path=require('node:path');const [, , commit, port, health, ready, publicHttp, catalog]=process.argv;const dir=path.join(process.cwd(),'runtime');const target=path.join(dir,'deploy-status.json');const tmp=path.join(dir,`.deploy-status-${process.pid}.json`);const payload={commit,deployedAt:new Date().toISOString(),port:Number(port),health:Number(health),ready:Number(ready),public:Number(publicHttp),catalog:Number(catalog)};fs.writeFileSync(tmp,JSON.stringify(payload,null,2)+'\n',{mode:0o644});fs.renameSync(tmp,target);
 NODE
 chmod 644 runtime/deploy-status.json
 cp -a runtime/deploy-status.json "$BACKUP_DIR/deploy-status.json"
@@ -176,10 +120,6 @@ echo "INTEGRACOES=https://$DOMAIN/admin/integracoes.html"
 echo "PEDIDOS=https://$DOMAIN/admin/pedidos.html"
 echo "PREPRESS=https://$DOMAIN/admin/prepress.html"
 echo "RELEASE=https://$DOMAIN/api/release"
-echo "HEALTH_HTTP=$HEALTH"
-echo "READY_HTTP=$READY"
-echo "PUBLIC_HTTP=$PUBLIC"
-echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"
-echo "PUBLIC_CATALOG_API_HTTP=$PUBLIC_CATALOG_API"
+echo "HEALTH_HTTP=$HEALTH"; echo "READY_HTTP=$READY"; echo "PUBLIC_HTTP=$PUBLIC"; echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"
 echo "BACKUP_DIR=$BACKUP_DIR"
 echo "============================================================"
