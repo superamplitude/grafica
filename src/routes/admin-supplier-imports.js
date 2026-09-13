@@ -4,21 +4,24 @@ import { parseSupplierPriceTable, SUPPLIER_PRICE_BODY_LIMIT } from '../domain/su
 import { executeSupplierPriceImport, previewSupplierPriceImport, rollbackSupplierPriceImport } from '../domain/supplier-price-sync.js';
 
 const querySchema=z.object({supplier_id:z.coerce.number().int().positive(),source_name:z.string().max(255).optional(),expected_sha256:z.string().regex(/^[a-f0-9]{64}$/i).optional()});
+const IMPORT_MEDIA_TYPES=['application/x-central-prints-supplier-table','application/vnd.ms-excel','text/html'];
 
-function parser(request,payload,done){
-  let body='';let bytes=0;payload.setEncoding('utf8');
-  payload.on('data',chunk=>{bytes+=Buffer.byteLength(chunk,'utf8');if(bytes>SUPPLIER_PRICE_BODY_LIMIT){const error=Object.assign(new Error('SUPPLIER_PRICE_FILE_TOO_LARGE'),{statusCode:413,code:'SUPPLIER_PRICE_FILE_TOO_LARGE'});done(error);payload.destroy();return;}body+=chunk;});
-  payload.on('end',()=>done(null,body));payload.on('error',done);
+function parser(_request,payload,done){
+  let body='';let bytes=0;let settled=false;payload.setEncoding('utf8');
+  const finish=(error,value)=>{if(settled)return;settled=true;done(error,value);};
+  payload.on('data',chunk=>{bytes+=Buffer.byteLength(chunk,'utf8');if(bytes>SUPPLIER_PRICE_BODY_LIMIT){const error=Object.assign(new Error('SUPPLIER_PRICE_FILE_TOO_LARGE'),{statusCode:413,code:'SUPPLIER_PRICE_FILE_TOO_LARGE'});finish(error);payload.destroy();return;}body+=chunk;});
+  payload.on('end',()=>finish(null,body));payload.on('error',error=>finish(error));
 }
 
 function importError(error,reply){
   const code=error?.code||error?.message||'SUPPLIER_IMPORT_ERROR';
-  const status=code==='SUPPLIER_NOT_FOUND'||code==='IMPORT_RUN_NOT_FOUND'?404:code==='ROLLBACK_CONFLICT'||code==='ROLLBACK_VARIANT_IN_USE'||code==='ROLLBACK_PRODUCT_IN_USE'||code==='ROLLBACK_CATEGORY_IN_USE'||code==='IMPORT_RUN_NOT_ROLLBACKABLE'?409:code==='SUPPLIER_PRICE_FILE_TOO_LARGE'?413:400;
-  const payload={error:code};if(error?.invalid_count)payload.invalid_count=error.invalid_count;if(error?.invalid)payload.invalid=error.invalid;if(error?.status)payload.status=error.status;if(error?.entity_type)payload.entity_type=error.entity_type;if(error?.entity_id)payload.entity_id=error.entity_id;return reply.code(status).send(payload);
+  const conflictCodes=new Set(['ROLLBACK_CONFLICT','ROLLBACK_VARIANT_IN_USE','ROLLBACK_PRODUCT_IN_USE','ROLLBACK_CATEGORY_IN_USE','IMPORT_RUN_NOT_ROLLBACKABLE','IMPORT_SOURCE_ALREADY_APPLIED','IMPORT_SOURCE_OLDER_THAN_CURRENT','IMPORT_EXTERNAL_CODE_CONFLICT']);
+  const status=code==='SUPPLIER_NOT_FOUND'||code==='IMPORT_RUN_NOT_FOUND'?404:conflictCodes.has(code)?409:code==='SUPPLIER_PRICE_FILE_TOO_LARGE'?413:400;
+  const payload={error:code};if(error?.invalid_count)payload.invalid_count=error.invalid_count;if(error?.invalid)payload.invalid=error.invalid;if(error?.status)payload.status=error.status;if(error?.entity_type)payload.entity_type=error.entity_type;if(error?.entity_id)payload.entity_id=error.entity_id;if(error?.existing_run_id)payload.existing_run_id=error.existing_run_id;if(error?.latest_report_date)payload.latest_report_date=error.latest_report_date;if(error?.conflicts)payload.conflicts=error.conflicts;return reply.code(status).send(payload);
 }
 
 export async function registerAdminSupplierImportRoutes(app){
-  for(const type of ['text/plain','text/html','application/vnd.ms-excel'])if(!app.hasContentTypeParser(type))app.addContentTypeParser(type,{bodyLimit:SUPPLIER_PRICE_BODY_LIMIT},parser);
+  for(const type of IMPORT_MEDIA_TYPES)if(!app.hasContentTypeParser(type))app.addContentTypeParser(type,{bodyLimit:SUPPLIER_PRICE_BODY_LIMIT},parser);
   const admins=app.requireRole('super_admin','admin');const superAdmin=app.requireRole('super_admin');
 
   app.get('/api/v1/admin/supplier-imports',{preHandler:admins},async(request)=>{
