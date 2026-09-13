@@ -5,7 +5,13 @@ export const SUPPLIER_PRICE_BODY_LIMIT = 24 * 1024 * 1024;
 const HEADER = ['código','categoria','descrição do serviço','cores','peso','qtde','tam','prazo','preço r$'];
 
 function decodeEntities(value='') {
-  const named={amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' '};
+  const named={
+    amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' ',
+    aacute:'á',eacute:'é',iacute:'í',oacute:'ó',uacute:'ú',
+    agrave:'à',egrave:'è',igrave:'ì',ograve:'ò',ugrave:'ù',
+    acirc:'â',ecirc:'ê',icirc:'î',ocirc:'ô',ucirc:'û',
+    atilde:'ã',otilde:'õ',ccedil:'ç',uuml:'ü',ordm:'º',ordf:'ª'
+  };
   return String(value)
     .replace(/&#x([0-9a-f]+);/gi,(_m,n)=>String.fromCodePoint(Number.parseInt(n,16)))
     .replace(/&#(\d+);/g,(_m,n)=>String.fromCodePoint(Number.parseInt(n,10)))
