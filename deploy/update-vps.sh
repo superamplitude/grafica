@@ -54,11 +54,7 @@ NEW_HEAD="$(git_safe rev-parse HEAD)"
 printf '%s\n' "$NEW_HEAD" > "$BACKUP_DIR/git-head.after.txt"
 
 log "Instalando dependencias reproduziveis"
-if [ -f package-lock.json ]; then
-  npm ci --omit=dev
-else
-  npm install --omit=dev
-fi
+if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
 APP_PORT="$(node --input-type=module -e "import 'dotenv/config'; const p=Number(process.env.PORT||${APP_PORT_DEFAULT}); if(!Number.isInteger(p)||p<1||p>65535) process.exit(2); process.stdout.write(String(p));")"
 printf '%s\n' "$APP_PORT" > "$BACKUP_DIR/app-port.txt"
@@ -112,6 +108,9 @@ echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"
 grep -qi 'Central Prints' "$BACKUP_DIR/public.html" || fail "Home publica sem identidade esperada."
 grep -qi 'Catálogo Central Prints' "$BACKUP_DIR/public-catalog.html" || fail "Catalogo publico sem conteudo esperado."
 
+log "Persistindo estado PM2 validado"
+pm2 save
+
 log "Registrando evidencia atomica da release"
 mkdir -p runtime
 node - "$NEW_HEAD" "$APP_PORT" "$HEALTH" "$READY" "$PUBLIC" "$PUBLIC_CATALOG" <<'NODE'
@@ -121,22 +120,12 @@ const [, , commit, port, health, ready, publicHttp, catalog]=process.argv;
 const dir=path.join(process.cwd(),'runtime');
 const target=path.join(dir,'deploy-status.json');
 const tmp=path.join(dir,`.deploy-status-${process.pid}.json`);
-const payload={
-  commit,
-  deployedAt:new Date().toISOString(),
-  port:Number(port),
-  health:Number(health),
-  ready:Number(ready),
-  public:Number(publicHttp),
-  catalog:Number(catalog)
-};
+const payload={commit,deployedAt:new Date().toISOString(),port:Number(port),health:Number(health),ready:Number(ready),public:Number(publicHttp),catalog:Number(catalog)};
 fs.writeFileSync(tmp,JSON.stringify(payload,null,2)+'\n',{mode:0o644});
 fs.renameSync(tmp,target);
 NODE
 chmod 644 runtime/deploy-status.json
 cp -a runtime/deploy-status.json "$BACKUP_DIR/deploy-status.json"
-
-pm2 save
 trap - ERR
 
 log "Deploy do site concluido"
