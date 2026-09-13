@@ -1,0 +1,17 @@
+{
+  "source_filename": "TabelaPreco.xls",
+  "detected_format": "html_xls",
+  "text_encoding": "ISO-8859/Latin-1",
+  "source_date": "2026-09-12",
+  "sha256": "c2a7f6b55d41467851195867e3a6cdfe351f38e947afef2ca7e60045ad62c2c5",
+  "row_count": 21329,
+  "unique_source_codes": 21329,
+  "category_count": 140,
+  "minimum_price_brl": 8.78,
+  "maximum_price_brl": 1916310.00,
+  "columns": ["Código","Categoria","Descrição do Serviço","Cores","Peso","Qtde","Tam","Prazo","Preço R$"],
+  "source_supplier": null,
+  "supplier_identification_status": "not_proven_by_file_content",
+  "automatic_catalog_apply": false,
+  "required_flow": ["stage","match","review","approve_explicitly","apply_in_separate_controlled_action"]
+}

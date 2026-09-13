@@ -85,7 +85,23 @@ jobs:
           if(Number(total.n)<40) throw new Error('REFERENCE_MANIFEST_TOO_SMALL');
           if(Number(unsafe.n)!==0) throw new Error('REFERENCE_QUARANTINE_BROKEN');
           if(Number(branded.n)<1) throw new Error('REFERENCE_BRANDING_HEURISTIC_MISSING');
-          console.log(JSON.stringify({ok:true,total:Number(total.n),branded:Number(branded.n)}));
+          await db.end();
+          NODE
+      - name: Stage supplier HTML-XLS price file twice
+        run: npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample' && npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample'
+      - name: Verify supplier price staging is idempotent and non-destructive
+        run: |
+          node --input-type=module <<'NODE'
+          import 'dotenv/config'; import {getDb} from './src/lib/db.js';
+          const db=getDb();
+          const [[imports]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_imports WHERE source_name='CI supplier sample'");
+          const [[rows]]=await db.query('SELECT COUNT(*) AS n FROM supplier_price_rows');
+          const [[unsafe]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_imports WHERE status='applied' OR applied_at IS NOT NULL");
+          const [[reviewed]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_rows WHERE review_status<>'pending'");
+          if(Number(imports.n)!==1) throw new Error('SUPPLIER_PRICE_IMPORT_NOT_IDEMPOTENT');
+          if(Number(rows.n)!==3) throw new Error('SUPPLIER_PRICE_ROW_COUNT_INVALID');
+          if(Number(unsafe.n)!==0) throw new Error('SUPPLIER_PRICE_AUTO_APPLY_DETECTED');
+          if(Number(reviewed.n)!==0) throw new Error('SUPPLIER_PRICE_AUTO_REVIEW_DETECTED');
           await db.end();
           NODE
       - name: Verify public price table against MySQL
@@ -134,7 +150,23 @@ jobs:
           if(Number(total.n)<40) throw new Error('REFERENCE_MANIFEST_TOO_SMALL');
           if(Number(unsafe.n)!==0) throw new Error('REFERENCE_QUARANTINE_BROKEN');
           if(Number(branded.n)<1) throw new Error('REFERENCE_BRANDING_HEURISTIC_MISSING');
-          console.log(JSON.stringify({ok:true,total:Number(total.n),branded:Number(branded.n)}));
+          await db.end();
+          NODE
+      - name: Stage supplier HTML-XLS price file twice
+        run: npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample' && npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample'
+      - name: Verify supplier price staging is idempotent and non-destructive
+        run: |
+          node --input-type=module <<'NODE'
+          import 'dotenv/config'; import {getDb} from './src/lib/db.js';
+          const db=getDb();
+          const [[imports]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_imports WHERE source_name='CI supplier sample'");
+          const [[rows]]=await db.query('SELECT COUNT(*) AS n FROM supplier_price_rows');
+          const [[unsafe]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_imports WHERE status='applied' OR applied_at IS NOT NULL");
+          const [[reviewed]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_rows WHERE review_status<>'pending'");
+          if(Number(imports.n)!==1) throw new Error('SUPPLIER_PRICE_IMPORT_NOT_IDEMPOTENT');
+          if(Number(rows.n)!==3) throw new Error('SUPPLIER_PRICE_ROW_COUNT_INVALID');
+          if(Number(unsafe.n)!==0) throw new Error('SUPPLIER_PRICE_AUTO_APPLY_DETECTED');
+          if(Number(reviewed.n)!==0) throw new Error('SUPPLIER_PRICE_AUTO_REVIEW_DETECTED');
           await db.end();
           NODE
       - name: Verify public price table against MariaDB
