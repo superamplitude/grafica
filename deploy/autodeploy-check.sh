@@ -76,8 +76,14 @@ chmod 700 "$SCRIPT_FILE"
 printf '%s\n' "$REMOTE_SHA" > "$STATE_DIR/deploy-target-sha"
 date -u +%FT%TZ > "$STATE_DIR/deploy-started-at"
 
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  log "Outro deploy esta em andamento; este ciclo foi adiado."
+  exit 0
+fi
+
 set +e
-flock -n "$LOCK_FILE" /bin/bash "$SCRIPT_FILE"
+/bin/bash "$SCRIPT_FILE"
 DEPLOY_RC=$?
 set -e
 if [ "$DEPLOY_RC" -eq 0 ]; then
@@ -88,9 +94,6 @@ if [ "$DEPLOY_RC" -eq 0 ]; then
   exit 0
 fi
 
-if [ "$DEPLOY_RC" -eq 1 ] && flock -n "$LOCK_FILE" true 2>/dev/null; then
-  :
-fi
 printf '%s\n' "$REMOTE_SHA" > "$STATE_DIR/last-failure-sha"
 date -u +%FT%TZ > "$STATE_DIR/last-failure-at"
 fail "Deploy falhou para ${REMOTE_SHA:0:12} (rc=$DEPLOY_RC); rollback do deploy oficial foi acionado."
