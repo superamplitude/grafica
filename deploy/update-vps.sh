@@ -67,6 +67,9 @@ log "Aplicando migracoes idempotentes e validando schema"
 npm run migrate
 npm run schema:verify
 
+log "Registrando referencias externas em quarentena"
+npm run reference:import | tee "$BACKUP_DIR/reference-import.json"
+
 log "Reiniciando Central Prints na porta local $APP_PORT"
 pm2 startOrReload ecosystem.config.cjs --update-env
 

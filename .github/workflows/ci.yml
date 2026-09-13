@@ -72,6 +72,22 @@ jobs:
           node-version: '22'
       - run: npm ci --omit=dev
       - run: npm run migrate && npm run migrate && npm run schema:verify
+      - name: Import quarantined Drive reference manifest
+        run: npm run reference:import && npm run reference:import
+      - name: Verify Drive references remain quarantined
+        run: |
+          node --input-type=module <<'NODE'
+          import 'dotenv/config'; import {getDb} from './src/lib/db.js';
+          const db=getDb();
+          const [[total]]=await db.query('SELECT COUNT(*) AS n FROM external_reference_assets');
+          const [[unsafe]]=await db.query("SELECT COUNT(*) AS n FROM external_reference_assets WHERE ingestion_status='imported' OR review_required=0 OR license_status<>'reference_only'");
+          const [[branded]]=await db.query("SELECT COUNT(*) AS n FROM external_reference_assets WHERE supplier_branding_risk='found'");
+          if(Number(total.n)<40) throw new Error('REFERENCE_MANIFEST_TOO_SMALL');
+          if(Number(unsafe.n)!==0) throw new Error('REFERENCE_QUARANTINE_BROKEN');
+          if(Number(branded.n)<1) throw new Error('REFERENCE_BRANDING_HEURISTIC_MISSING');
+          console.log(JSON.stringify({ok:true,total:Number(total.n),branded:Number(branded.n)}));
+          await db.end();
+          NODE
       - name: Verify public price table against MySQL
         run: node src/scripts/verify-price-table.js
       - name: Verify assets, templates, hero and commerce against MySQL
@@ -105,6 +121,22 @@ jobs:
           node-version: '22'
       - run: npm ci --omit=dev
       - run: npm run migrate && npm run migrate && npm run schema:verify
+      - name: Import quarantined Drive reference manifest
+        run: npm run reference:import && npm run reference:import
+      - name: Verify Drive references remain quarantined
+        run: |
+          node --input-type=module <<'NODE'
+          import 'dotenv/config'; import {getDb} from './src/lib/db.js';
+          const db=getDb();
+          const [[total]]=await db.query('SELECT COUNT(*) AS n FROM external_reference_assets');
+          const [[unsafe]]=await db.query("SELECT COUNT(*) AS n FROM external_reference_assets WHERE ingestion_status='imported' OR review_required=0 OR license_status<>'reference_only'");
+          const [[branded]]=await db.query("SELECT COUNT(*) AS n FROM external_reference_assets WHERE supplier_branding_risk='found'");
+          if(Number(total.n)<40) throw new Error('REFERENCE_MANIFEST_TOO_SMALL');
+          if(Number(unsafe.n)!==0) throw new Error('REFERENCE_QUARANTINE_BROKEN');
+          if(Number(branded.n)<1) throw new Error('REFERENCE_BRANDING_HEURISTIC_MISSING');
+          console.log(JSON.stringify({ok:true,total:Number(total.n),branded:Number(branded.n)}));
+          await db.end();
+          NODE
       - name: Verify public price table against MariaDB
         run: node src/scripts/verify-price-table.js
       - name: Verify assets, templates, hero and commerce against MariaDB
