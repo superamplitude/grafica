@@ -33,6 +33,8 @@ jobs:
         run: npm ci --omit=dev
       - name: Static and runtime verification
         run: npm run verify
+      - name: Validate bundled supplier catalog integrity
+        run: npm run catalog:sync -- --dry-run
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
       - name: Export tested package lock
@@ -46,7 +48,7 @@ jobs:
 
   mysql-schema:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     services:
       mysql:
         image: mysql:8.4
@@ -72,6 +74,10 @@ jobs:
           node-version: '22'
       - run: npm ci --omit=dev
       - run: npm run migrate && npm run migrate && npm run schema:verify
+      - name: Import full product catalog twice
+        run: npm run catalog:sync && npm run catalog:sync
+      - name: Verify full product catalog against MySQL
+        run: npm run catalog:verify
       - name: Import quarantined Drive reference manifest
         run: npm run reference:import && npm run reference:import
       - name: Verify Drive references remain quarantined
@@ -111,7 +117,7 @@ jobs:
 
   mariadb-schema:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     services:
       mariadb:
         image: mariadb:11.8
@@ -137,6 +143,10 @@ jobs:
           node-version: '22'
       - run: npm ci --omit=dev
       - run: npm run migrate && npm run migrate && npm run schema:verify
+      - name: Import full product catalog twice
+        run: npm run catalog:sync && npm run catalog:sync
+      - name: Verify full product catalog against MariaDB
+        run: npm run catalog:verify
       - name: Import quarantined Drive reference manifest
         run: npm run reference:import && npm run reference:import
       - name: Verify Drive references remain quarantined
