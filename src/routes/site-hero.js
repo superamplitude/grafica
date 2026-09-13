@@ -1,10 +1,6 @@
 import { getDb } from '../lib/db.js';
 import { publicObjectUrl } from '../lib/storage.js';
-
-function hasPricing(data = {}) {
-  const text=[data.eyebrow,data.title,data.body,data.cta_label,data.secondary_cta_label].filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-  return /r\$\s*\d|\bpre[cç]o\b|\ba partir de\b|\bpor apenas\b|\bde\s+r\$|\d+[.,]\d{2}(?:\s|$)|\b\d+\s*%\s*(?:off|de desconto)\b/i.test(text);
-}
+import { heroTextHasPricing } from '../domain/hero-policy.js';
 
 export async function registerSiteHeroRoutes(app) {
   app.get('/api/v1/site/hero', async () => {
@@ -28,7 +24,7 @@ export async function registerSiteHeroRoutes(app) {
        LIMIT 6
     `);
     return {
-      items: rows.filter((row)=>!hasPricing(row)).map((row) => ({
+      items: rows.filter((row)=>!heroTextHasPricing(row)).map((row) => ({
         id: Number(row.id),
         name: row.name,
         eyebrow: row.eyebrow,
