@@ -76,6 +76,8 @@ jobs:
         run: node src/scripts/verify-price-table.js
       - name: Verify assets, templates, hero and commerce against MySQL
         run: node src/scripts/verify-assets-commerce.js
+      - name: Verify audited supplier price import against MySQL
+        run: npm run supplier-import:verify
 
   mariadb-schema:
     runs-on: ubuntu-latest
@@ -109,3 +111,5 @@ jobs:
         run: node src/scripts/verify-price-table.js
       - name: Verify assets, templates, hero and commerce against MariaDB
         run: node src/scripts/verify-assets-commerce.js
+      - name: Verify audited supplier price import against MariaDB
+        run: npm run supplier-import:verify
