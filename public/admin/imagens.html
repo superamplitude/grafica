@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Imagens de Produtos · Super Admin · Central Prints</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/admin/admin-extra.css">
+  <link rel="stylesheet" href="/admin/imagens.css">
+</head>
+<body class="product-images-page">
+  <div class="images-shell">
+    <header class="images-topbar">
+      <div><a href="/admin/" class="back-link">← Super Admin</a><h1>Imagens de Produtos</h1><p>Upload, capa, galeria e revisão. O catálogo só mostra fotos reais aprovadas e sem identificação de fornecedor.</p></div>
+      <div class="user-box"><strong id="imagesUser">Carregando…</strong><span id="imagesRole"></span></div>
+    </header>
+
+    <div class="images-layout">
+      <aside class="panel images-products">
+        <div class="panel-head"><div><h2>Produtos</h2><p>Escolha o produto que receberá as fotos.</p></div></div>
+        <input id="imagesProductSearch" type="search" placeholder="Buscar produto">
+        <div id="imagesProductList" class="images-product-list"><div class="images-empty">Carregando…</div></div>
+      </aside>
+
+      <main class="panel images-workspace" id="imagesWorkspace" hidden>
+        <div class="panel-head"><div><h2 id="imagesProductTitle">Produto</h2><p id="imagesProductMeta"></p></div><a id="imagesPublicLink" class="action" href="#" target="_blank" rel="noopener">Ver produto ↗</a></div>
+        <div class="images-rule">Somente <strong>fotografia real do produto</strong>. Não aprove logomarca, URL, código, marca d'água ou qualquer referência ao fornecedor. Mockup/render não substitui a foto real principal.</div>
+
+        <form id="imageUploadForm" class="image-upload-form">
+          <label>Foto real<input id="productImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/avif" required></label>
+          <label>Uso<select id="productImageRole"><option value="cover">Imagem principal / capa</option><option value="gallery">Galeria</option></select></label>
+          <label>Ordem<input id="productImageOrder" type="number" value="0" step="1"></label>
+          <button class="action primary" type="submit">Enviar e vincular</button>
+          <span id="imageUploadMessage"></span>
+        </form>
+
+        <div class="images-toolbar"><div><h3>Fotos vinculadas</h3><p>Fotos novas ficam invisíveis ao público até a auditoria.</p></div><a class="action" href="/admin/integracoes.html">Abrir auditoria de ativos →</a></div>
+        <div id="productImageGrid" class="product-image-grid"></div>
+      </main>
+    </div>
+  </div>
+  <script type="module" src="/admin/imagens.js"></script>
+</body>
+</html>
