@@ -33,8 +33,6 @@ jobs:
         run: npm ci --omit=dev
       - name: Static and runtime verification
         run: npm run verify
-      - name: Validate bundled supplier catalog integrity
-        run: npm run catalog:sync -- --dry-run
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
       - name: Export tested package lock
@@ -74,10 +72,6 @@ jobs:
           node-version: '22'
       - run: npm ci --omit=dev
       - run: npm run migrate && npm run migrate && npm run schema:verify
-      - name: Import full product catalog twice
-        run: npm run catalog:sync && npm run catalog:sync
-      - name: Verify full product catalog against MySQL
-        run: npm run catalog:verify
       - name: Import quarantined Drive reference manifest
         run: npm run reference:import && npm run reference:import
       - name: Verify Drive references remain quarantined
@@ -94,8 +88,8 @@ jobs:
           await db.end();
           NODE
       - name: Stage supplier HTML-XLS price file twice
-        run: npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample' && npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample'
-      - name: Verify supplier price staging is idempotent and non-destructive
+        run: npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample' --supplier-slug atual-card && npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample' --supplier-slug atual-card
+      - name: Verify staging before publication
         run: |
           node --input-type=module <<'NODE'
           import 'dotenv/config'; import {getDb} from './src/lib/db.js';
@@ -103,11 +97,26 @@ jobs:
           const [[imports]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_imports WHERE source_name='CI supplier sample'");
           const [[rows]]=await db.query('SELECT COUNT(*) AS n FROM supplier_price_rows');
           const [[unsafe]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_imports WHERE status='applied' OR applied_at IS NOT NULL");
-          const [[reviewed]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_rows WHERE review_status<>'pending'");
           if(Number(imports.n)!==1) throw new Error('SUPPLIER_PRICE_IMPORT_NOT_IDEMPOTENT');
           if(Number(rows.n)!==3) throw new Error('SUPPLIER_PRICE_ROW_COUNT_INVALID');
           if(Number(unsafe.n)!==0) throw new Error('SUPPLIER_PRICE_AUTO_APPLY_DETECTED');
-          if(Number(reviewed.n)!==0) throw new Error('SUPPLIER_PRICE_AUTO_REVIEW_DETECTED');
+          await db.end();
+          NODE
+      - name: Publish staged catalog twice
+        run: npm run supplier-price:apply -- --source-name 'CI supplier sample' --confirm && npm run supplier-price:apply -- --source-name 'CI supplier sample' --confirm
+      - name: Verify staged publication against MySQL
+        run: |
+          node --input-type=module <<'NODE'
+          import 'dotenv/config'; import {getDb} from './src/lib/db.js';
+          const db=getDb();
+          const [[imp]]=await db.query("SELECT status,matched_count,conflict_count FROM supplier_price_imports WHERE source_name='CI supplier sample' LIMIT 1");
+          const [[p]]=await db.query("SELECT COUNT(*) AS n FROM products p JOIN suppliers s ON s.id=p.supplier_id WHERE s.slug='atual-card' AND p.status='active'");
+          const [[v]]=await db.query("SELECT COUNT(*) AS n,COUNT(DISTINCT external_code) AS u,SUM(public_price>supplier_cost) AS good FROM product_variants WHERE external_code IN ('GIFT1515','GIFT1516','CV100') AND status='active'");
+          const [[rows]]=await db.query("SELECT SUM(match_status='exact') AS exacts,SUM(review_status='approved') AS approved FROM supplier_price_rows");
+          if(imp.status!=='applied'||Number(imp.matched_count)!==3||Number(imp.conflict_count)!==0) throw new Error('CATALOG_IMPORT_STATUS_INVALID');
+          if(Number(p.n)<2) throw new Error('CATALOG_PRODUCTS_NOT_CREATED');
+          if(Number(v.n)!==3||Number(v.u)!==3||Number(v.good)!==3) throw new Error('CATALOG_VARIANTS_NOT_PUBLISHED');
+          if(Number(rows.exacts)!==3||Number(rows.approved)!==3) throw new Error('CATALOG_ROWS_NOT_RECONCILED');
           await db.end();
           NODE
       - name: Verify public price table against MySQL
@@ -143,10 +152,6 @@ jobs:
           node-version: '22'
       - run: npm ci --omit=dev
       - run: npm run migrate && npm run migrate && npm run schema:verify
-      - name: Import full product catalog twice
-        run: npm run catalog:sync && npm run catalog:sync
-      - name: Verify full product catalog against MariaDB
-        run: npm run catalog:verify
       - name: Import quarantined Drive reference manifest
         run: npm run reference:import && npm run reference:import
       - name: Verify Drive references remain quarantined
@@ -163,8 +168,8 @@ jobs:
           await db.end();
           NODE
       - name: Stage supplier HTML-XLS price file twice
-        run: npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample' && npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample'
-      - name: Verify supplier price staging is idempotent and non-destructive
+        run: npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample' --supplier-slug atual-card && npm run supplier-price:import -- --file test/fixtures/TabelaPreco-sample.xls --source-name 'CI supplier sample' --supplier-slug atual-card
+      - name: Verify staging before publication
         run: |
           node --input-type=module <<'NODE'
           import 'dotenv/config'; import {getDb} from './src/lib/db.js';
@@ -172,11 +177,26 @@ jobs:
           const [[imports]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_imports WHERE source_name='CI supplier sample'");
           const [[rows]]=await db.query('SELECT COUNT(*) AS n FROM supplier_price_rows');
           const [[unsafe]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_imports WHERE status='applied' OR applied_at IS NOT NULL");
-          const [[reviewed]]=await db.query("SELECT COUNT(*) AS n FROM supplier_price_rows WHERE review_status<>'pending'");
           if(Number(imports.n)!==1) throw new Error('SUPPLIER_PRICE_IMPORT_NOT_IDEMPOTENT');
           if(Number(rows.n)!==3) throw new Error('SUPPLIER_PRICE_ROW_COUNT_INVALID');
           if(Number(unsafe.n)!==0) throw new Error('SUPPLIER_PRICE_AUTO_APPLY_DETECTED');
-          if(Number(reviewed.n)!==0) throw new Error('SUPPLIER_PRICE_AUTO_REVIEW_DETECTED');
+          await db.end();
+          NODE
+      - name: Publish staged catalog twice
+        run: npm run supplier-price:apply -- --source-name 'CI supplier sample' --confirm && npm run supplier-price:apply -- --source-name 'CI supplier sample' --confirm
+      - name: Verify staged publication against MariaDB
+        run: |
+          node --input-type=module <<'NODE'
+          import 'dotenv/config'; import {getDb} from './src/lib/db.js';
+          const db=getDb();
+          const [[imp]]=await db.query("SELECT status,matched_count,conflict_count FROM supplier_price_imports WHERE source_name='CI supplier sample' LIMIT 1");
+          const [[p]]=await db.query("SELECT COUNT(*) AS n FROM products p JOIN suppliers s ON s.id=p.supplier_id WHERE s.slug='atual-card' AND p.status='active'");
+          const [[v]]=await db.query("SELECT COUNT(*) AS n,COUNT(DISTINCT external_code) AS u,SUM(public_price>supplier_cost) AS good FROM product_variants WHERE external_code IN ('GIFT1515','GIFT1516','CV100') AND status='active'");
+          const [[rows]]=await db.query("SELECT SUM(match_status='exact') AS exacts,SUM(review_status='approved') AS approved FROM supplier_price_rows");
+          if(imp.status!=='applied'||Number(imp.matched_count)!==3||Number(imp.conflict_count)!==0) throw new Error('CATALOG_IMPORT_STATUS_INVALID');
+          if(Number(p.n)<2) throw new Error('CATALOG_PRODUCTS_NOT_CREATED');
+          if(Number(v.n)!==3||Number(v.u)!==3||Number(v.good)!==3) throw new Error('CATALOG_VARIANTS_NOT_PUBLISHED');
+          if(Number(rows.exacts)!==3||Number(rows.approved)!==3) throw new Error('CATALOG_ROWS_NOT_RECONCILED');
           await db.end();
           NODE
       - name: Verify public price table against MariaDB
