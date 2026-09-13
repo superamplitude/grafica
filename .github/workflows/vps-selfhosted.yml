@@ -48,22 +48,4 @@ jobs:
           curl -fsS --max-time 5 http://127.0.0.1:3005/api/release || true
           echo
           echo "=== DATABASE COUNTS (SEM CREDENCIAIS) ==="
-          sudo -n -u belastock-grafica -H bash -lc "cd '$APP' && node --input-type=module <<'NODE'
-import 'dotenv/config';
-import mysql from 'mysql2/promise';
-const db = await mysql.createConnection({
-  host: process.env.DB_HOST || '127.0.0.1',
-  port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
-});
-const [tables] = await db.query('SHOW TABLES');
-const names = new Set(tables.map(r => Object.values(r)[0]));
-for (const table of ['products','product_variants','categories','staff_users','supplier_price_imports','supplier_price_rows','media_assets','media_asset_reviews']) {
-  if (!names.has(table)) { console.log(`${table}=MISSING_TABLE`); continue; }
-  const [rows] = await db.query(`SELECT COUNT(*) AS c FROM \\`${table}\\``);
-  console.log(`${table}=${rows[0].c}`);
-}
-await db.end();
-NODE"
+          sudo -n -u belastock-grafica -H bash -lc "cd '$APP' && node --input-type=module -e \"import 'dotenv/config'; import mysql from 'mysql2/promise'; const db=await mysql.createConnection({host:process.env.DB_HOST||'127.0.0.1',port:Number(process.env.DB_PORT||3306),user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME}); const [t]=await db.query('SHOW TABLES'); const names=new Set(t.map(r=>Object.values(r)[0])); for (const table of ['products','product_variants','categories','staff_users','supplier_price_imports','supplier_price_rows','media_assets','media_asset_reviews']) { if(!names.has(table)){console.log(table+'=MISSING_TABLE');continue;} const [rows]=await db.query('SELECT COUNT(*) AS c FROM '+table); console.log(table+'='+rows[0].c); } await db.end();\""
