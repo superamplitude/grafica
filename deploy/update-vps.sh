@@ -62,6 +62,7 @@ log "Porta local detectada: $APP_PORT"
 
 log "Executando verificacao de codigo antes de alterar o banco"
 npm run verify
+npm run catalog:sync -- --dry-run | tee "$BACKUP_DIR/catalog-integrity.json"
 
 log "Aplicando migracoes idempotentes e validando schema"
 npm run migrate
@@ -69,6 +70,10 @@ npm run schema:verify
 
 log "Registrando referencias externas em quarentena"
 npm run reference:import | tee "$BACKUP_DIR/reference-import.json"
+
+log "Sincronizando catalogo real da tabela de precos enviada"
+npm run catalog:sync | tee "$BACKUP_DIR/catalog-sync.json"
+npm run catalog:verify | tee "$BACKUP_DIR/catalog-verify.json"
 
 log "Reiniciando Central Prints na porta local $APP_PORT"
 pm2 startOrReload ecosystem.config.cjs --update-env
@@ -96,20 +101,44 @@ echo "LOCAL_CATALOG_HTTP=$CATALOG"
 grep -qi 'Central Prints' "$BACKUP_DIR/home.html" || fail "Home respondeu 200 sem identidade Central Prints."
 grep -qi 'Catálogo Central Prints' "$BACKUP_DIR/catalogo.html" || fail "Catalogo respondeu 200 sem o conteudo esperado."
 
+log "Provando catalogo pela API local"
+CATALOG_SUMMARY_HTTP="$(curl -sS --max-time 10 -o "$BACKUP_DIR/catalog-summary.json" -w '%{http_code}' "http://127.0.0.1:$APP_PORT/api/v1/catalog/summary" || true)"
+PRODUCTS_HTTP="$(curl -sS --max-time 10 -o "$BACKUP_DIR/catalog-products.json" -w '%{http_code}' "http://127.0.0.1:$APP_PORT/api/v1/products?limit=1" || true)"
+[ "$CATALOG_SUMMARY_HTTP" = "200" ] || fail "Resumo do catalogo falhou: $CATALOG_SUMMARY_HTTP"
+[ "$PRODUCTS_HTTP" = "200" ] || fail "API de produtos falhou: $PRODUCTS_HTTP"
+node - "$BACKUP_DIR/catalog-summary.json" "$BACKUP_DIR/catalog-products.json" <<'NODE'
+const fs=require('node:fs');
+const [, , summaryPath, productsPath]=process.argv;
+const summary=JSON.parse(fs.readFileSync(summaryPath,'utf8'));
+const products=JSON.parse(fs.readFileSync(productsPath,'utf8'));
+if(Number(summary.products)<1075)throw new Error(`PUBLIC_CATALOG_PRODUCTS_TOO_SMALL:${summary.products}`);
+if(Number(summary.variants)<21329)throw new Error(`PUBLIC_CATALOG_VARIANTS_TOO_SMALL:${summary.variants}`);
+if(!Array.isArray(products.items)||products.items.length<1)throw new Error('PUBLIC_CATALOG_EMPTY');
+console.log(JSON.stringify({ok:true,products:summary.products,variants:summary.variants,first_product:products.items[0]?.slug||null}));
+NODE
+
 log "Validando HTTPS de origem e publico"
 ORIGIN="$(curl -ksS --resolve "$DOMAIN:443:127.0.0.1" --max-time 15 -o "$BACKUP_DIR/origin.html" -w '%{http_code}' "https://$DOMAIN/?deploy=$STAMP" || true)"
 PUBLIC="$(curl -kLsS --max-redirs 5 --max-time 20 -o "$BACKUP_DIR/public.html" -w '%{http_code}' "https://$DOMAIN/?deploy=$STAMP" || true)"
 PUBLIC_CATALOG="$(curl -kLsS --max-redirs 5 --max-time 20 -o "$BACKUP_DIR/public-catalog.html" -w '%{http_code}' "https://$DOMAIN/catalogo.html?deploy=$STAMP" || true)"
+PUBLIC_CATALOG_API="$(curl -kLsS --max-redirs 5 --max-time 20 -o "$BACKUP_DIR/public-catalog-api.json" -w '%{http_code}' "https://$DOMAIN/api/v1/catalog/summary?deploy=$STAMP" || true)"
 
 echo "ORIGIN_HTTP=$ORIGIN"
 echo "PUBLIC_HTTP=$PUBLIC"
 echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"
+echo "PUBLIC_CATALOG_API_HTTP=$PUBLIC_CATALOG_API"
 [ "$ORIGIN" = "200" ] || fail "Origem HTTPS falhou: $ORIGIN"
 [ "$PUBLIC" = "200" ] || fail "Home publica falhou: $PUBLIC"
 [ "$PUBLIC_CATALOG" = "200" ] || fail "Catalogo publico falhou: $PUBLIC_CATALOG"
+[ "$PUBLIC_CATALOG_API" = "200" ] || fail "API publica do catalogo falhou: $PUBLIC_CATALOG_API"
 
 grep -qi 'Central Prints' "$BACKUP_DIR/public.html" || fail "Home publica sem identidade esperada."
 grep -qi 'Catálogo Central Prints' "$BACKUP_DIR/public-catalog.html" || fail "Catalogo publico sem conteudo esperado."
+node - "$BACKUP_DIR/public-catalog-api.json" <<'NODE'
+const fs=require('node:fs');
+const summary=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+if(Number(summary.products)<1075||Number(summary.variants)<21329)throw new Error(`PUBLIC_CATALOG_NOT_POPULATED:${summary.products}/${summary.variants}`);
+NODE
 
 log "Persistindo estado PM2 validado"
 pm2 save
@@ -151,5 +180,6 @@ echo "HEALTH_HTTP=$HEALTH"
 echo "READY_HTTP=$READY"
 echo "PUBLIC_HTTP=$PUBLIC"
 echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"
+echo "PUBLIC_CATALOG_API_HTTP=$PUBLIC_CATALOG_API"
 echo "BACKUP_DIR=$BACKUP_DIR"
 echo "============================================================"
