@@ -9,7 +9,7 @@ const requiredColumns={
   product_variants:['external_code','supplier_cost','additional_cost','public_price','reseller_price','quantity','availability'],
   product_templates:['media_id','external_url','template_type','version_label','side','width_mm','height_mm','bleed_mm','brand_neutral','verified_at','verified_by_user_id','status'],
   media_asset_reviews:['media_id','usage_type','photo_type','supplier_branding','price_text','license_status','review_status','reviewed_by_user_id','reviewed_at'],
-  commerce_integrations:['integration_type','provider_code','display_name','integration_mode','status','capabilities_json','config_json','secret_env_json','verified_at','verified_by_user_id'],
+  commerce_integrations:['integration_type','provider_code','display_name','integration_mode','adapter_status','status','capabilities_json','config_json','secret_env_json','verified_at','verified_by_user_id'],
   orders:['payment_status','payment_provider','paid_total'],
   artworks:['superseded_at'],
   proofs:['staff_note'],
