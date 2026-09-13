@@ -11,7 +11,7 @@
 <body class="integrations-page">
   <div class="integrations-shell">
     <header class="integrations-topbar">
-      <div><a href="/admin/" class="back-link">← Super Admin</a><h1>Integrações e Ativos</h1><p>Gateways, transportadoras, gabaritos e auditoria de imagens públicas.</p></div>
+      <div><a href="/admin/" class="back-link">← Super Admin</a><h1>Integrações e Ativos</h1><p>Gateways, transportadoras, gabaritos, referências externas e auditoria de imagens públicas.</p></div>
       <div class="user-box"><strong id="integrationUser">Carregando…</strong><span id="integrationRole"></span></div>
     </header>
 
@@ -23,6 +23,12 @@
     <section class="panel">
       <div class="panel-head"><div><h2>Transportadoras e entrega</h2><p>Integrações de frete ficam inativas até teste real de cotação, etiqueta ou retirada.</p></div></div>
       <div id="shippingIntegrations" class="integration-grid"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Referências externas em quarentena</h2><p>Materiais do Drive e de fornecedores entram apenas como referência. Nada desta área é publicado automaticamente.</p></div><div class="asset-filters"><select id="externalUsage"><option value="">Todos os usos</option><option value="product">Produto</option><option value="template">Gabarito</option><option value="reference">Referência</option></select><select id="externalBranding"><option value="">Toda marca</option><option value="found">Marca detectada</option><option value="unknown">Não verificado</option><option value="clear">Limpo</option></select><button class="action" id="reloadExternal" type="button">Atualizar</button></div></div>
+      <div id="externalSummary" class="reference-summary"></div>
+      <div id="externalGrid" class="reference-grid"></div>
     </section>
 
     <section class="panel">
