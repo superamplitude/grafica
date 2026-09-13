@@ -8,12 +8,15 @@ function arg(name, fallback=null){const i=process.argv.indexOf(`--${name}`);retu
 const sourcePath=arg('file')||process.argv[2];
 if(!sourcePath)throw new Error('PRICE_IMPORT_FILE_REQUIRED');
 const sourceName=arg('source-name')||path.basename(sourcePath);
+const expectedChecksum=String(arg('expected-sha256')||'').trim().toLowerCase();
+if(expectedChecksum && !/^[a-f0-9]{64}$/.test(expectedChecksum))throw new Error('INVALID_EXPECTED_SHA256');
 const supplierIdRaw=arg('supplier-id');
 const supplierId=supplierIdRaw?Number(supplierIdRaw):null;
 if(supplierIdRaw && (!Number.isInteger(supplierId)||supplierId<=0))throw new Error('INVALID_SUPPLIER_ID');
 
 const bytes=await fs.readFile(sourcePath);
 const parsed=parseHtmlXlsPriceTable(bytes);
+if(expectedChecksum && parsed.checksum_sha256!==expectedChecksum)throw new Error(`PRICE_IMPORT_CHECKSUM_MISMATCH:${parsed.checksum_sha256}`);
 const db=getDb();
 try{
   if(supplierId){const [supplierRows]=await db.execute('SELECT id FROM suppliers WHERE id=? LIMIT 1',[supplierId]);if(!supplierRows.length)throw new Error('SUPPLIER_NOT_FOUND');}
@@ -30,7 +33,7 @@ try{
       (supplier_id,source_name,source_filename,source_checksum_sha256,source_date,source_format,status,row_count,category_count,metadata_json)
       VALUES (?,?,?,?,?,'html_xls','staged',?,?,?)`,[
         supplierId,sourceName,path.basename(sourcePath),parsed.checksum_sha256,parsed.source_date,parsed.row_count,parsed.category_count,
-        JSON.stringify({source_size_bytes:bytes.length,parser:'html_xls_v1',automatic_apply:false})
+        JSON.stringify({source_size_bytes:bytes.length,parser:'html_xls_v1',automatic_apply:false,checksum_locked:Boolean(expectedChecksum)})
       ]);
     const importId=Number(result.insertId);
     const batchSize=300;
