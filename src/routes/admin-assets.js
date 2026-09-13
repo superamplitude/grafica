@@ -12,7 +12,7 @@ const reviewSchema = z.object({
   notes: z.string().max(10000).optional().nullable()
 });
 
-function approvalError(data) {
+export function approvalError(data) {
   if (data.review_status !== 'approved') return null;
   if (!['owned','licensed'].includes(data.license_status)) return 'ASSET_LICENSE_NOT_APPROVED';
   if (data.supplier_branding !== 'clear') return 'SUPPLIER_BRANDING_NOT_CLEAR';
