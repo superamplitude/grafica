@@ -1,0 +1,20 @@
+{
+  "source": "Atual Card",
+  "source_page": "https://dinhasgraficacriativa.atualcard.com.br/tabela-de-precos",
+  "source_date": "2026-09-12",
+  "source_file": "TabelaPreco.xls",
+  "source_file_sha256": "c2a7f6b55d41467851195867e3a6cdfe351f38e947afef2ca7e60045ad62c2c5",
+  "dataset_sha256": "784429656a7610b7cd82c6a482322b749b312b1a31e33787686aebf06d6bfdf1",
+  "row_count": 21329,
+  "category_count": 140,
+  "product_group_count": 1075,
+  "columns": ["code","category","description","colors","weight","quantity","size","production_days","supplier_price_brl"],
+  "publication": {
+    "products": "active",
+    "variants": "active",
+    "supplier_exposed": false,
+    "public_price_rule": "real_margin_percentage:35;minimum_margin:10;rounding:ending_90",
+    "reseller_price_rule": "real_margin_percentage:18;minimum_margin:10;rounding:ending_90"
+  },
+  "provenance_note": "Derivado da TabelaPreco.xls enviada pelo proprietário junto à página de tabela de preços da Atual Card. GIV Online e Zap Gráfica são referências visuais/funcionais separadas."
+}
