@@ -1,5 +1,10 @@
 import crypto from 'node:crypto';
 
+function decodeSource(bytes){
+  const utf8=bytes.toString('utf8');
+  return Buffer.from(utf8,'utf8').equals(bytes)?utf8:bytes.toString('latin1');
+}
+
 function decodeEntities(text=''){
   return String(text)
     .replace(/&nbsp;/gi,' ')
@@ -43,7 +48,7 @@ export function parseSourceDate(text=''){
 export function parseHtmlXlsPriceTable(buffer){
   const bytes=Buffer.isBuffer(buffer)?buffer:Buffer.from(buffer);
   const checksum=crypto.createHash('sha256').update(bytes).digest('hex');
-  const html=bytes.toString('latin1');
+  const html=decodeSource(bytes);
   if(!/<table\b/i.test(html))throw new Error('PRICE_SOURCE_NOT_HTML_TABLE');
   const sourceDate=parseSourceDate(cellText(html.slice(0,20000)));
   const rows=[];
@@ -77,11 +82,5 @@ export function parseHtmlXlsPriceTable(buffer){
   if(!rows.length)throw new Error('PRICE_SOURCE_NO_ROWS');
   const codes=new Set();
   for(const row of rows){if(codes.has(row.source_code))throw new Error(`PRICE_SOURCE_DUPLICATE_CODE:${row.source_code}`);codes.add(row.source_code);}
-  return {
-    checksum_sha256:checksum,
-    source_date:sourceDate,
-    rows,
-    row_count:rows.length,
-    category_count:new Set(rows.map(r=>r.category_name)).size
-  };
+  return {checksum_sha256:checksum,source_date:sourceDate,rows,row_count:rows.length,category_count:new Set(rows.map(r=>r.category_name)).size};
 }
