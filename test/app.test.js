@@ -23,7 +23,10 @@ for (const [url, marker] of [
   ['/pedido.html', /Acompanhe sua solicitação/i],
   ['/admin/', /Super Admin/i],
   ['/admin/catalogo.html', /Editor de Catálogo/i],
+  ['/admin/imagens.html', /Imagens de Produtos/i],
   ['/admin/site.html', /Editor do Site/i],
+  ['/admin/gabaritos.html', /Gabaritos/i],
+  ['/admin/integracoes.html', /Integrações e Ativos/i],
   ['/admin/pedidos.html', /Pedidos/i],
   ['/admin/prepress.html', /Pré-impressão/i],
   ['/admin/finalizacao.html', /Finalização e Publicação/i]

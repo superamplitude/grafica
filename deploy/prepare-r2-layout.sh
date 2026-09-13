@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+APP_DIR="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
+ENV_FILE="$APP_DIR/.env"
+ACCOUNT_ID="${R2_ACCOUNT_ID_OVERRIDE:-a0be928ceaeef58b28803e20eca4ed0a}"
+PUBLIC_BUCKET="${R2_PUBLIC_BUCKET_OVERRIDE:-grafica}"
+PRIVATE_BUCKET="${R2_PRIVATE_BUCKET_OVERRIDE:-grafica-private}"
+
+fail(){ echo "[ERRO] $*" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || fail "Execute como root."
+[ -f "$ENV_FILE" ] || fail ".env nao encontrado em $ENV_FILE"
+command -v python3 >/dev/null 2>&1 || fail "python3 nao encontrado."
+
+STAMP="$(date +%Y%m%d_%H%M%S)"
+BACKUP_DIR="/home/belastock-grafica/backups/r2_layout_$STAMP"
+mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+cp -a "$ENV_FILE" "$BACKUP_DIR/env.before"
+chmod 600 "$BACKUP_DIR/env.before"
+
+python3 - "$ENV_FILE" "$ACCOUNT_ID" "$PUBLIC_BUCKET" "$PRIVATE_BUCKET" <<'PY'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1])
+vals={
+  'R2_REQUIRED':'false',
+  'R2_ACCOUNT_ID':sys.argv[2],
+  'R2_PUBLIC_BUCKET':sys.argv[3],
+  'R2_PRIVATE_BUCKET':sys.argv[4],
+}
+lines=p.read_text().splitlines(); out=[]; seen=set()
+for line in lines:
+    if '=' in line and not line.lstrip().startswith('#'):
+        key=line.split('=',1)[0]
+        if key in vals:
+            out.append(f'{key}={vals[key]}'); seen.add(key); continue
+        if key == 'R2_BUCKET':
+            continue
+    out.append(line)
+for key,value in vals.items():
+    if key not in seen: out.append(f'{key}={value}')
+p.write_text('\n'.join(out)+'\n')
+PY
+chmod 600 "$ENV_FILE"
+
+printf '\nCENTRAL PRINTS R2 LAYOUT PREPARADO\n'
+printf 'ACCOUNT_ID=%s\n' "$ACCOUNT_ID"
+printf 'PUBLIC_BUCKET=%s\n' "$PUBLIC_BUCKET"
+printf 'PRIVATE_BUCKET=%s\n' "$PRIVATE_BUCKET"
+printf 'R2_REQUIRED=false (sera ativado apenas apos prova real)\n'
+printf 'BACKUP_DIR=%s\n' "$BACKUP_DIR"
+printf '\nProximo comando quando Access Key, Secret e URL publica estiverem no .env:\n'
+printf '  bash %s/deploy/bootstrap-r2.sh\n' "$APP_DIR"

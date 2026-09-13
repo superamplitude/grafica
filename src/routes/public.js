@@ -35,18 +35,22 @@ async function productPayloadBySlug(slug) {
   const [mediaRows] = await db.execute(`
     SELECT pm.role,pm.sort_order,m.kind,m.object_key,m.original_name,m.mime_type,m.metadata_json
       FROM product_media pm
-      JOIN media_objects m ON m.id=pm.media_id
-     WHERE pm.product_id=? AND m.visibility='public'
+      JOIN media_objects m ON m.id=pm.media_id AND m.visibility='public'
+      JOIN media_asset_reviews r ON r.media_id=m.id
+       AND r.usage_type='product' AND r.photo_type='real' AND r.supplier_branding='clear'
+       AND r.license_status IN ('owned','licensed') AND r.review_status='approved'
+     WHERE pm.product_id=?
      ORDER BY FIELD(pm.role,'cover','gallery','mockup','technical'),pm.sort_order,pm.id
   `, [product.id]);
 
   const [templates] = await db.execute(`
-    SELECT pt.id,pt.template_type,pt.side,pt.width_mm,pt.height_mm,pt.bleed_mm,
-           m.object_key,m.original_name,m.mime_type
+    SELECT pt.id,pt.template_type,pt.version_label,pt.side,pt.width_mm,pt.height_mm,pt.bleed_mm,
+           pt.external_url,m.object_key,m.original_name,m.mime_type
       FROM product_templates pt
-      JOIN media_objects m ON m.id=pt.media_id
-     WHERE pt.product_id=? AND pt.status='active' AND m.visibility='public'
-     ORDER BY pt.side,pt.template_type,pt.id
+      LEFT JOIN media_objects m ON m.id=pt.media_id AND m.visibility='public' AND m.kind='template'
+     WHERE pt.product_id=? AND pt.status='active' AND pt.brand_neutral=1 AND pt.verified_at IS NOT NULL
+       AND ((pt.media_id IS NOT NULL AND m.id IS NOT NULL) OR (pt.template_type='canva' AND pt.external_url LIKE 'https://%'))
+     ORDER BY FIELD(pt.side,'front','back','duplex','general'),FIELD(pt.template_type,'pdf','ai','cdr','psd','indd','canva','svg','eps','other'),pt.id
   `, [product.id]);
 
   return {
@@ -62,7 +66,7 @@ async function productPayloadBySlug(slug) {
       production_json: asJson(row.production_json)
     })),
     media: mediaRows.map((row) => ({ ...withPublicUrl(row), metadata_json: asJson(row.metadata_json) })),
-    templates: templates.map((row) => withPublicUrl(row))
+    templates: templates.map((row) => ({ ...row, url: row.object_key ? publicObjectUrl(row.object_key) : row.external_url }))
   };
 }
 
@@ -139,9 +143,14 @@ export async function registerPublicRoutes(app) {
                         WHERE v.product_id=p.id AND v.status='active' AND v.availability<>'unavailable'),p.base_price) AS starting_price,
              (SELECT COUNT(*) FROM product_variants v2
                 WHERE v2.product_id=p.id AND v2.status='active' AND v2.availability<>'unavailable') AS variants_count,
-             (SELECT m.object_key FROM product_media pm JOIN media_objects m ON m.id=pm.media_id
-                WHERE pm.product_id=p.id AND pm.role='cover' AND m.visibility='public'
-                ORDER BY pm.sort_order,pm.id LIMIT 1) AS cover_key
+             (SELECT m.object_key
+                FROM product_media pm
+                JOIN media_objects m ON m.id=pm.media_id AND m.visibility='public'
+                JOIN media_asset_reviews r ON r.media_id=m.id
+                 AND r.usage_type='product' AND r.photo_type='real' AND r.supplier_branding='clear'
+                 AND r.license_status IN ('owned','licensed') AND r.review_status='approved'
+               WHERE pm.product_id=p.id AND pm.role='cover'
+               ORDER BY pm.sort_order,pm.id LIMIT 1) AS cover_key
         FROM products p
         LEFT JOIN categories c ON c.id=p.category_id
        WHERE ${where.join(' AND ')}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Integrações e Ativos · Super Admin · Central Prints</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/admin/admin-extra.css">
+  <link rel="stylesheet" href="/admin/integracoes.css">
+</head>
+<body class="integrations-page">
+  <div class="integrations-shell">
+    <header class="integrations-topbar">
+      <div><a href="/admin/" class="back-link">← Super Admin</a><h1>Integrações e Ativos</h1><p>Gateways, transportadoras, gabaritos e auditoria de imagens públicas.</p></div>
+      <div class="user-box"><strong id="integrationUser">Carregando…</strong><span id="integrationRole"></span></div>
+    </header>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Gateways de pagamento</h2><p>Somente conectores implementados, homologados e ativos podem aparecer no checkout.</p></div><button class="action" id="reloadCommerce" type="button">Atualizar</button></div>
+      <div id="paymentIntegrations" class="integration-grid"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Transportadoras e entrega</h2><p>Integrações de frete ficam inativas até teste real de cotação, etiqueta ou retirada.</p></div></div>
+      <div id="shippingIntegrations" class="integration-grid"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>Auditoria de imagens e gabaritos</h2><p>Produto: somente foto real. Hero: sem preço. Todos: sem logomarca do fornecedor e com direito de uso confirmado.</p></div><div class="asset-filters"><select id="assetKind"><option value="">Todos</option><option value="product-photo">Fotos de produto</option><option value="banner">Hero/banners</option><option value="template">Gabaritos</option></select><select id="assetStatus"><option value="unreviewed">Não revisados</option><option value="pending">Pendentes</option><option value="approved">Aprovados</option><option value="rejected">Rejeitados</option><option value="">Todos</option></select><button class="action" id="reloadAssets" type="button">Atualizar</button></div></div>
+      <div id="assetGrid" class="asset-grid"></div>
+    </section>
+
+    <dialog id="assetDialog" class="asset-dialog"><form method="dialog" id="assetReviewForm"><button class="dialog-close" value="cancel" aria-label="Fechar">×</button><div class="asset-dialog-grid"><div><img id="assetPreview" alt="Prévia do ativo"></div><div><h2 id="assetTitle">Revisar ativo</h2><input type="hidden" id="assetId"><label>Uso<select id="assetUsage"><option value="product">Produto</option><option value="hero">Hero</option><option value="template">Gabarito</option><option value="other">Outro</option></select></label><label>Tipo visual<select id="assetPhotoType"><option value="real">Foto real</option><option value="render">Render/mockup</option><option value="illustration">Ilustração</option><option value="not_applicable">Não se aplica</option><option value="unknown">Não verificado</option></select></label><label>Marca do fornecedor<select id="assetBrand"><option value="clear">Nenhuma</option><option value="found">Encontrada</option><option value="unknown">Não verificado</option></select></label><label>Preço na imagem<select id="assetPriceText"><option value="clear">Nenhum</option><option value="found">Encontrado</option><option value="unknown">Não verificado</option></select></label><label>Direito de uso<select id="assetLicense"><option value="owned">Próprio</option><option value="licensed">Licenciado</option><option value="reference_only">Somente referência</option><option value="unknown">Não verificado</option></select></label><label>Status<select id="assetReviewStatus"><option value="pending">Pendente</option><option value="approved">Aprovado</option><option value="rejected">Rejeitado</option></select></label><label>Observações<textarea id="assetNotes" rows="4" maxlength="10000"></textarea></label><div class="dialog-actions"><button class="action primary" id="saveAssetReview" type="button">Salvar revisão</button><span id="assetMessage"></span></div></div></div></form></dialog>
+  </div>
+  <script type="module" src="/admin/integracoes.js"></script>
+</body>
+</html>

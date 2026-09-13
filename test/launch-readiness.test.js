@@ -52,9 +52,20 @@ test('repair suggestions never invent content and only use existing price or des
 test('stable readiness remains blocked until external attestations are verified', () => {
   const result = buildLaunchChecklist({
     storage: 'ok',
-    metrics: { products_total: 12, pilot_candidates: 6, active_hero_banners: 1 },
+    metrics: { products_total: 12, pilot_candidates: 6, active_hero_banners: 1, active_payment_integrations:1, active_shipping_integrations:0 },
     attestations: { payment:{status:'verified'}, shipping:{status:'pending'}, email:{status:'pending'}, mobile:{status:'pending'} }
   });
   assert.equal(result.ready_for_stable, false);
+  assert.ok(result.critical_failures.includes('shipping'));
+});
+
+test('human attestation alone does not mark payment or shipping ready without active verified connector', () => {
+  const result = buildLaunchChecklist({
+    storage:'ok',
+    metrics:{products_total:10,pilot_candidates:5,active_hero_banners:1,active_payment_integrations:0,active_shipping_integrations:0},
+    attestations:{payment:{status:'verified'},shipping:{status:'verified'},email:{status:'verified'},mobile:{status:'verified'}}
+  });
+  assert.equal(result.ready_for_stable,false);
+  assert.ok(result.critical_failures.includes('payment'));
   assert.ok(result.critical_failures.includes('shipping'));
 });

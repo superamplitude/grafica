@@ -27,12 +27,12 @@ export function evaluateProductReadiness(row = {}) {
   };
 
   const labels = {
-    cover: 'imagem principal',
+    cover: 'foto real principal revisada, licenciada e sem marca de fornecedor',
     priced_variant: 'variante disponível com preço público',
     category: 'categoria comercial válida',
     description: 'descrição comercial suficiente',
     variant: 'variante ativa',
-    template: 'gabarito técnico ativo',
+    template: 'gabarito técnico neutro e verificado',
     supplier: 'fornecedor aprovado para produção terceirizada/híbrida',
     status: 'status publicável'
   };
@@ -66,13 +66,15 @@ export function repairSuggestions(row = {}) {
 
 export function buildLaunchChecklist({ storage = 'unconfigured', metrics = {}, attestations = {} } = {}) {
   const attestation = (key) => attestations[key]?.status || 'pending';
+  const paymentReady = num(metrics.active_payment_integrations) > 0 && attestation('payment') === 'verified';
+  const shippingReady = num(metrics.active_shipping_integrations) > 0 && attestation('shipping') === 'verified';
   const items = [
     { id:'storage', label:'Armazenamento público/privado', critical:true, weight:15, status:storage === 'ok' ? 'pass' : 'fail', detail:`R2: ${storage}` },
     { id:'catalog', label:'Catálogo com produtos', critical:true, weight:10, status:num(metrics.products_total) > 0 ? 'pass' : 'fail', detail:`${num(metrics.products_total)} produto(s)` },
     { id:'pilot', label:'Mínimo de 5 produtos completos para piloto', critical:true, weight:20, status:num(metrics.pilot_candidates) >= 5 ? 'pass' : 'fail', detail:`${num(metrics.pilot_candidates)} candidato(s)` },
-    { id:'payment', label:'Gateway de pagamento verificado no ambiente real', critical:true, weight:15, status:attestation('payment') === 'verified' ? 'pass' : (attestation('payment') === 'blocked' ? 'fail' : 'pending'), detail:attestations.payment?.note || 'Confirmação humana pendente.' },
-    { id:'shipping', label:'Entrega/retirada verificada no ambiente real', critical:true, weight:15, status:attestation('shipping') === 'verified' ? 'pass' : (attestation('shipping') === 'blocked' ? 'fail' : 'pending'), detail:attestations.shipping?.note || 'Confirmação humana pendente.' },
-    { id:'hero', label:'Campanha principal ativa', critical:false, weight:5, status:num(metrics.active_hero_banners) > 0 ? 'pass' : 'pending', detail:`${num(metrics.active_hero_banners)} campanha(s) ativa(s)` },
+    { id:'payment', label:'Gateway de pagamento implementado, ativo e verificado', critical:true, weight:15, status:paymentReady ? 'pass' : (attestation('payment') === 'blocked' ? 'fail' : 'pending'), detail:paymentReady ? `${num(metrics.active_payment_integrations)} gateway(s) ativo(s) e homologado(s)` : (attestations.payment?.note || `${num(metrics.active_payment_integrations)} gateway(s) ativo(s) verificado(s)`) },
+    { id:'shipping', label:'Transportadora/entrega implementada, ativa e verificada', critical:true, weight:15, status:shippingReady ? 'pass' : (attestation('shipping') === 'blocked' ? 'fail' : 'pending'), detail:shippingReady ? `${num(metrics.active_shipping_integrations)} integração(ões) de entrega ativa(s)` : (attestations.shipping?.note || `${num(metrics.active_shipping_integrations)} integração(ões) de entrega ativa(s) verificada(s)`) },
+    { id:'hero', label:'Hero ativo sem preço e com imagem revisada', critical:false, weight:5, status:num(metrics.active_hero_banners) > 0 ? 'pass' : 'pending', detail:`${num(metrics.active_hero_banners)} campanha(s) segura(s) ativa(s)` },
     { id:'email', label:'E-mail transacional verificado', critical:false, weight:10, status:attestation('email') === 'verified' ? 'pass' : (attestation('email') === 'blocked' ? 'fail' : 'pending'), detail:attestations.email?.note || 'Validar durante compra controlada.' },
     { id:'mobile', label:'Compra e acompanhamento em mobile verificados', critical:false, weight:10, status:attestation('mobile') === 'verified' ? 'pass' : (attestation('mobile') === 'blocked' ? 'fail' : 'pending'), detail:attestations.mobile?.note || 'Validar na homologação.' }
   ];
