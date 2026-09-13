@@ -26,6 +26,7 @@ Type=oneshot
 User=root
 Group=root
 ExecStart=/usr/local/sbin/central-prints-autodeploy
+Environment=NPM_CONFIG_CACHE=/tmp/central-prints-npm-cache
 Nice=5
 IOSchedulingClass=best-effort
 IOSchedulingPriority=6
