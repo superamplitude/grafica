@@ -45,6 +45,15 @@ test('GET /api returns service metadata', async () => {
   assert.equal(body.name, 'Central Prints API');
 });
 
+test('GET /api/release is safe even before first evidenced deploy', async () => {
+  const response = await app.inject({ method: 'GET', url: '/api/release' });
+  assert.equal(response.statusCode, 200);
+  const body = response.json();
+  assert.equal(body.service, 'central-prints-node');
+  assert.ok(body.release);
+  assert.equal(Object.hasOwn(body.release, 'commit'), true);
+});
+
 test('GET /api/health is liveness and remains 200 without database', async () => {
   const response = await app.inject({ method: 'GET', url: '/api/health' });
   assert.equal(response.statusCode, 200);
