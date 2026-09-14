@@ -9,47 +9,51 @@ permissions:
   contents: read
 
 jobs:
-  locate-install:
+  probe-zap-table:
     runs-on: [self-hosted, central-prints, vps, production]
     timeout-minutes: 10
     steps:
-      - name: Localizar instalação, fonte e estado do Central Prints
+      - name: Baixar e validar tabela pública atual da Zap
         shell: bash
         run: |
           set -Eeuo pipefail
-          TARGET_SHA="c2a7f6b55d41467851195867e3a6cdfe351f38e947afef2ca7e60045ad62c2c5"
-          BR_SHA="59a15139e462cb05bf4332caaa8e51e11f3605a64bd2dee006c2067f602f8e2e"
-          echo "RUNNER=$(whoami) HOST=$(hostname)"
-          getent passwd belastock-grafica | sed -E 's/:x:[0-9]+:[0-9]+:/:x:UID:GID:/' || true
-          echo "SUDO_SITE_USER=$(sudo -n -u belastock-grafica true 2>/dev/null && echo OK || echo NO)"
-          echo '=== CANDIDATOS DE APP ==='
-          for root in /home /var/www /opt; do
-            [ -e "$root" ] || continue
-            find "$root" -maxdepth 6 -type d \( -name 'grafica.belastock.com.br' -o -iname '*central*prints*' -o -iname '*belastock*grafica*' \) -print 2>/dev/null | head -100 || true
-          done
-          echo '=== REPOS GIT RELACIONADOS ==='
-          for root in /home /var/www /opt/actions-runner-central-prints; do
-            [ -e "$root" ] || continue
-            find "$root" -maxdepth 7 -type d -name .git -print 2>/dev/null | grep -Ei 'grafica|print|belastock' | head -100 || true
-          done
-          echo '=== PROCESSOS/PORTAS ==='
-          ps -eo user:24,pid,cmd | grep -Ei 'central-prints|grafica|node .*server' | grep -v grep | head -100 || true
-          ss -ltnp 2>/dev/null | grep -E ':(3005|3210)\b' || true
-          echo '=== FONTE/PAYLOAD ==='
-          OUT="$RUNNER_TEMP/catalog-candidates.txt"; : > "$OUT"
-          for root in /home /opt/actions-runner-central-prints /tmp; do
-            [ -e "$root" ] || continue
-            find "$root" -xdev -type f \( -iname 'TabelaPreco*.xls' -o -iname '*catalog*.xls' -o -size 15835682c -o -size 245615c \) -print 2>/dev/null >> "$OUT" || true
-          done
-          sort -u "$OUT" -o "$OUT"
-          FOUND_SOURCE=""; FOUND_BR=""
-          while IFS= read -r f; do
-            [ -f "$f" ] || continue
-            bytes="$(wc -c < "$f" | tr -d ' ')"
-            sha="$(sha256sum "$f" | awk '{print $1}')"
-            echo "CANDIDATE bytes=$bytes sha=$sha path=$f"
-            [ "$sha" = "$TARGET_SHA" ] && FOUND_SOURCE="$f"
-            [ "$sha" = "$BR_SHA" ] && FOUND_BR="$f"
-          done < "$OUT"
-          echo "CATALOG_SOURCE_FOUND=${FOUND_SOURCE:-NO}"
-          echo "CATALOG_BROTLI_FOUND=${FOUND_BR:-NO}"
+          URL='https://www.zapgrafica.com.br/tabelaprecos/tabelaprecosxls'
+          OUT="$RUNNER_TEMP/zap-current.xls"
+          curl -fLksS --max-time 120 "$URL" -o "$OUT"
+          echo "BYTES=$(wc -c < "$OUT" | tr -d ' ')"
+          echo "SHA256=$(sha256sum "$OUT" | awk '{print $1}')"
+          file "$OUT" || true
+          python3 - "$OUT" <<'PY'
+          import sys,re,html,hashlib
+          p=sys.argv[1]
+          b=open(p,'rb').read()
+          try:s=b.decode('utf-8')
+          except:s=b.decode('latin1','ignore')
+          def txt(x):
+              x=re.sub(r'<br\s*/?>',' ',x,flags=re.I)
+              x=re.sub(r'<[^>]*>',' ',x)
+              return re.sub(r'\s+',' ',html.unescape(x)).strip()
+          m=re.search(r'TABELA\s+DE\s+PRE[CÇ]OS\s+(\d{2}/\d{2}/\d{4})',txt(s[:30000]),re.I)
+          rows=[]
+          for rm in re.finditer(r'<tr\b[^>]*>([\s\S]*?)</tr>',s,re.I):
+              cells=[txt(x) for x in re.findall(r'<t[dh]\b[^>]*>([\s\S]*?)</t[dh]>',rm.group(1),re.I)]
+              if len(cells)!=9: continue
+              if re.match(r'^c[oó]digo$',cells[0],re.I) or not cells[0]: continue
+              price=re.sub(r'R\$\s*','',cells[8],flags=re.I).replace('.','').replace(',','.')
+              price=re.sub(r'[^0-9.-]','',price)
+              try: float(price)
+              except: continue
+              rows.append(cells)
+          codes=[r[0] for r in rows]
+          cats={r[1] for r in rows}
+          groups={(r[1], re.sub(r'\s*-\s*\d+(?:[.,]\d+)?g$','',re.sub(r'^'+re.escape(r[1])+r'\s*-\s*','',r[2],flags=re.I),flags=re.I).strip()) for r in rows}
+          print('SOURCE_DATE='+(m.group(1) if m else 'NONE'))
+          print('ROWS='+str(len(rows)))
+          print('UNIQUE_CODES='+str(len(set(codes))))
+          print('DUPLICATES='+str(len(codes)-len(set(codes))))
+          print('CATEGORIES='+str(len(cats)))
+          print('PRODUCT_GROUPS='+str(len(groups)))
+          if rows:
+              print('FIRST_CODE='+rows[0][0])
+              print('LAST_CODE='+rows[-1][0])
+          PY
