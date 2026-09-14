@@ -26,13 +26,40 @@ recover_runtime_env(){
     log "Ambiente de banco ja disponivel para o deploy."
     return 0
   fi
-  local proc cwd comm entry key value
+
+  local proc cwd comm cmdline entry key value
+
+  if [ -r "$APP_DIR/.env" ]; then
+    while IFS= read -r -d '' entry; do
+      key="${entry%%=*}"
+      value="${entry#*=}"
+      case "$key" in
+        NODE_ENV|APP_NAME|APP_URL|HOST|PORT|DB_REQUIRED|DB_HOST|DB_PORT|DB_NAME|DB_USER|DB_PASSWORD|R2_REQUIRED|R2_ACCOUNT_ID|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|R2_PUBLIC_BUCKET|R2_PRIVATE_BUCKET|R2_PUBLIC_BASE_URL|JWT_SECRET)
+          printf -v "$key" '%s' "$value"
+          export "$key"
+          ;;
+      esac
+    done < <(node --input-type=module <<'NODE'
+import 'dotenv/config';
+const keys=['NODE_ENV','APP_NAME','APP_URL','HOST','PORT','DB_REQUIRED','DB_HOST','DB_PORT','DB_NAME','DB_USER','DB_PASSWORD','R2_REQUIRED','R2_ACCOUNT_ID','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','R2_PUBLIC_BUCKET','R2_PRIVATE_BUCKET','R2_PUBLIC_BASE_URL','JWT_SECRET'];
+for(const key of keys){const value=process.env[key];if(value!==undefined&&value!=='')process.stdout.write(`${key}=${value}\0`);}
+NODE
+)
+    if [ -n "${DB_NAME:-}" ] && [ -n "${DB_USER:-}" ]; then
+      log "Ambiente operacional carregado do .env protegido sem expor credenciais."
+      return 0
+    fi
+  fi
+
   for proc in /proc/[0-9]*; do
     [ -r "$proc/environ" ] || continue
-    cwd="$(readlink -f "$proc/cwd" 2>/dev/null || true)"
-    [ "$cwd" = "$APP_DIR" ] || continue
     comm="$(cat "$proc/comm" 2>/dev/null || true)"
     [ "$comm" = "node" ] || continue
+    cwd="$(readlink -f "$proc/cwd" 2>/dev/null || true)"
+    cmdline="$(tr '\0' ' ' < "$proc/cmdline" 2>/dev/null || true)"
+    if [ "$cwd" != "$APP_DIR" ] && [[ "$cmdline" != *"$APP_DIR"* ]]; then
+      continue
+    fi
     while IFS= read -r -d '' entry; do
       key="${entry%%=*}"
       value="${entry#*=}"
@@ -48,7 +75,7 @@ recover_runtime_env(){
       return 0
     fi
   done
-  fail "Nao foi possivel recuperar DB_NAME/DB_USER do processo Central Prints ativo. Deploy bloqueado antes de qualquer alteracao."
+  fail "Nao foi possivel recuperar DB_NAME/DB_USER do .env protegido nem do processo Central Prints ativo. Deploy bloqueado antes de qualquer alteracao."
 }
 
 recover_runtime_env
