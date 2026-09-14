@@ -10,7 +10,27 @@ function withPublicUrl(row, keyField = 'object_key', targetField = 'url') {
   return { ...row, [targetField]: row?.[keyField] ? publicObjectUrl(row[keyField]) : null };
 }
 
-async function productPayloadBySlug(slug) {
+function absoluteUrl(request,path){
+  const proto=String(request?.headers?.['x-forwarded-proto']||request?.protocol||'https').split(',')[0].trim()||'https';
+  const host=String(request?.headers?.['x-forwarded-host']||request?.headers?.host||'grafica.belastock.com.br').split(',')[0].trim();
+  return `${proto}://${host}${path}`;
+}
+
+function productLinks(request,slug,coverKey=null){
+  const encoded=encodeURIComponent(slug);
+  const preview=absoluteUrl(request,`/api/v1/products/${encoded}/preview.svg`);
+  const cover=coverKey?publicObjectUrl(coverKey):null;
+  return {
+    cover_url:cover,
+    technical_preview_url:preview,
+    image_url:cover||preview,
+    image_type:cover?'real_photo':'technical_preview',
+    gabaritos_url:absoluteUrl(request,`/api/v1/products/${encoded}/generated-gabaritos`),
+    product_url:absoluteUrl(request,`/produto.html?slug=${encoded}`)
+  };
+}
+
+async function productPayloadBySlug(slug,request) {
   const db = getDb();
   const [products] = await db.execute(`
     SELECT p.id,p.name,p.slug,p.short_description,p.description,p.base_price,p.requires_artwork,
@@ -53,19 +73,28 @@ async function productPayloadBySlug(slug) {
      ORDER BY FIELD(pt.side,'front','back','duplex','general'),FIELD(pt.template_type,'pdf','ai','cdr','psd','indd','canva','svg','eps','other'),pt.id
   `, [product.id]);
 
+  const media=mediaRows.map((row) => ({ ...withPublicUrl(row), metadata_json: asJson(row.metadata_json) }));
+  const cover=media.find(item=>item.role==='cover'&&item.url)?.url||media[0]?.url||null;
+  const links=productLinks(request,product.slug,null);
   return {
     ...product,
     base_price: Number(product.base_price || 0),
     config_json: asJson(product.config_json),
     seo_json: asJson(product.seo_json),
+    ...links,
+    cover_url:cover,
+    image_url:cover||links.technical_preview_url,
+    image_type:cover?'real_photo':'technical_preview',
     variants: variants.map((row) => ({
       ...row,
       public_price: Number(row.public_price || 0),
       quantity: Number(row.quantity || 0),
       attributes_json: asJson(row.attributes_json),
-      production_json: asJson(row.production_json)
+      production_json: asJson(row.production_json),
+      gabarito_url:absoluteUrl(request,`/api/v1/gabaritos/${encodeURIComponent(row.external_code||row.sku||row.id)}.svg`),
+      gabarito_download_url:absoluteUrl(request,`/api/v1/gabaritos/${encodeURIComponent(row.external_code||row.sku||row.id)}.svg?download=1`)
     })),
-    media: mediaRows.map((row) => ({ ...withPublicUrl(row), metadata_json: asJson(row.metadata_json) })),
+    media,
     templates: templates.map((row) => ({ ...row, url: row.object_key ? publicObjectUrl(row.object_key) : row.external_url }))
   };
 }
@@ -101,6 +130,27 @@ export async function registerPublicRoutes(app) {
       min_price: row.min_price == null ? null : Number(row.min_price),
       max_price: row.max_price == null ? null : Number(row.max_price)
     };
+  });
+
+  app.get('/api/v1/catalog/complete', async (request) => {
+    const db=getDb();
+    const [rows]=await db.query(`
+      SELECT p.id,p.sku,p.name,p.slug,p.short_description,p.description,p.base_price,p.requires_artwork,p.supports_front,p.supports_back,p.featured,
+             c.name AS category_name,c.slug AS category_slug,
+             COALESCE((SELECT MIN(NULLIF(v.public_price,0)) FROM product_variants v WHERE v.product_id=p.id AND v.status='active' AND v.availability<>'unavailable'),p.base_price) AS starting_price,
+             (SELECT COUNT(*) FROM product_variants v2 WHERE v2.product_id=p.id AND v2.status='active' AND v2.availability<>'unavailable') AS variants_count,
+             (SELECT m.object_key FROM product_media pm JOIN media_objects m ON m.id=pm.media_id AND m.visibility='public' JOIN media_asset_reviews r ON r.media_id=m.id AND r.usage_type='product' AND r.photo_type='real' AND r.supplier_branding='clear' AND r.license_status IN ('owned','licensed') AND r.review_status='approved' WHERE pm.product_id=p.id AND pm.role='cover' ORDER BY pm.sort_order,pm.id LIMIT 1) AS cover_key
+        FROM products p
+        LEFT JOIN categories c ON c.id=p.category_id
+       WHERE p.status='active'
+       ORDER BY c.sort_order,c.name,p.name,p.id
+    `);
+    return {generated_at:new Date().toISOString(),items:rows.map(row=>({
+      id:Number(row.id),sku:row.sku,name:row.name,slug:row.slug,category_name:row.category_name,category_slug:row.category_slug,
+      short_description:row.short_description,description:row.description,starting_price:Number(row.starting_price||0),variants_count:Number(row.variants_count||0),
+      requires_artwork:Boolean(Number(row.requires_artwork)),supports_front:Boolean(Number(row.supports_front)),supports_back:Boolean(Number(row.supports_back)),
+      ...productLinks(request,row.slug,row.cover_key)
+    }))};
   });
 
   app.get('/api/v1/products', async (request) => {
@@ -165,7 +215,7 @@ export async function registerPublicRoutes(app) {
         base_price: Number(row.base_price || 0),
         starting_price: Number(row.starting_price || 0),
         variants_count: Number(row.variants_count || 0),
-        cover_url: row.cover_key ? publicObjectUrl(row.cover_key) : null
+        ...productLinks(request,row.slug,row.cover_key)
       })),
       total,
       limit,
@@ -175,14 +225,16 @@ export async function registerPublicRoutes(app) {
   });
 
   app.get('/api/v1/products/:slug', async (request, reply) => {
-    const product = await productPayloadBySlug(String(request.params.slug));
+    const product = await productPayloadBySlug(String(request.params.slug),request);
     if (!product) return reply.code(404).send({ error: 'PRODUCT_NOT_FOUND' });
     return product;
   });
 
   app.get('/api/v1/configurator/:slug', async (request, reply) => {
-    const product = await productPayloadBySlug(String(request.params.slug));
+    const product = await productPayloadBySlug(String(request.params.slug),request);
     if (!product) return reply.code(404).send({ error: 'PRODUCT_NOT_FOUND' });
+    const visuals=product.media.filter((item) => item.role !== 'technical');
+    if(!visuals.length) visuals.push({role:'technical_preview',kind:'generated',url:product.technical_preview_url,visual_type:'technical_preview'});
     return {
       product: {
         id: product.id,
@@ -195,10 +247,15 @@ export async function registerPublicRoutes(app) {
         requires_artwork: product.requires_artwork,
         supports_front: product.supports_front,
         supports_back: product.supports_back,
-        config: product.config_json
+        config: product.config_json,
+        image_url:product.image_url,
+        image_type:product.image_type,
+        technical_preview_url:product.technical_preview_url,
+        gabaritos_url:product.gabaritos_url,
+        product_url:product.product_url
       },
       variants: product.variants.filter((variant) => variant.availability !== 'unavailable'),
-      visuals: product.media.filter((item) => item.role !== 'technical'),
+      visuals,
       templates: product.templates
     };
   });
@@ -224,7 +281,8 @@ export async function registerPublicRoutes(app) {
       size: variant.size_label,
       production_days: variant.production_days,
       price: Number(variant.public_price || 0),
-      currency: 'BRL'
+      currency: 'BRL',
+      gabarito_url:absoluteUrl(request,`/api/v1/gabaritos/${encodeURIComponent(variant.external_code||variant.sku)}.svg`)
     };
   });
 
