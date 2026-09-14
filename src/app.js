@@ -11,6 +11,7 @@ import { registerAuth } from './plugins/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerPriceTableRoutes } from './routes/price-table.js';
 import { registerTemplateRoutes } from './routes/templates.js';
+import { registerGeneratedAssetRoutes } from './routes/generated-assets.js';
 import { registerCommerceRoutes } from './routes/commerce.js';
 import { registerSiteHeroRoutes } from './routes/site-hero.js';
 import { registerAuthRoutes } from './routes/auth.js';
@@ -77,6 +78,7 @@ export async function buildApp() {
   await registerPublicRoutes(app);
   await registerPriceTableRoutes(app);
   await registerTemplateRoutes(app);
+  await registerGeneratedAssetRoutes(app);
   await registerCommerceRoutes(app);
   await registerSiteHeroRoutes(app);
   await registerOrderRoutes(app);
