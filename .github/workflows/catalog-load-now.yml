@@ -3,32 +3,113 @@ name: Central Prints Catalog Load Now
 on:
   push:
     branches: [ops/catalog-load-now]
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  probe-drive-source:
+  load-catalog:
     runs-on: [self-hosted, central-prints, vps, production]
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
-      - name: Testar exportação pública da tabela no Google Drive
+      - name: Baixar, validar, importar e auditar catálogo
         shell: bash
         run: |
           set -Eeuo pipefail
-          ID='1sFgDMU0TXl-S4y-jbai-6eV5XE6WC2kS'
-          for kind in xlsx csv; do
-            if [ "$kind" = xlsx ]; then
-              URL="https://docs.google.com/spreadsheets/d/$ID/export?format=xlsx"
-            else
-              URL="https://docs.google.com/spreadsheets/d/$ID/export?format=csv&gid=0"
-            fi
-            OUT="$RUNNER_TEMP/drive-source.$kind"
-            code="$(curl -LksS --max-time 120 -o "$OUT" -w '%{http_code}' "$URL" || true)"
-            echo "KIND=$kind HTTP=$code BYTES=$(wc -c < "$OUT" 2>/dev/null || echo 0)"
-            file "$OUT" 2>/dev/null || true
-            sha256sum "$OUT" 2>/dev/null || true
-            head -c 120 "$OUT" 2>/dev/null | tr '\n\r' '  ' | sed 's/[^[:print:]\t]/./g' || true
-            echo
-          done
+          APP='/home/belastock-grafica/htdocs/grafica.belastock.com.br'
+          SOURCE='/tmp/CentralPrints-TabelaPreco-2026-09-12.xls'
+          SOURCE_NAME='TabelaPreco-2026-09-12.xls'
+          SOURCE_SHA='c2a7f6b55d41467851195867e3a6cdfe351f38e947afef2ca7e60045ad62c2c5'
+          SOURCE_BYTES='15835682'
+          SOURCE_SLUG='source-table-2026-09-12'
+          SOURCE_URL='https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-2ffc-820e-bb96-6f0aaa4bb29d/raw?se=2026-09-14T20%3A53%3A44Z&sp=r&sv=2026-02-06&sr=b&scid=83ca0868-411e-575a-a489-c41a7887a6e4&skoid=db6dad9e-03ee-465b-aef6-ce0f63a161dc&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-14T20%3A09%3A26Z&ske=2026-09-15T20%3A09%3A26Z&sks=b&skv=2026-02-06&sig=Hwz%2BhE723nAjFEBQcXAbP2JGVE1KPUJ0Y0kCX9QPu7Q%3D'
+
+          rm -f "$SOURCE"
+          curl -fLksS --retry 3 --retry-delay 2 --max-time 180 "$SOURCE_URL" -o "$SOURCE"
+          test "$(wc -c < "$SOURCE" | tr -d ' ')" = "$SOURCE_BYTES"
+          printf '%s  %s\n' "$SOURCE_SHA" "$SOURCE" | sha256sum -c -
+          chmod 0644 "$SOURCE"
+          echo "SOURCE_VERIFIED sha256=$SOURCE_SHA bytes=$SOURCE_BYTES"
+
+          sudo -n -u belastock-grafica env SOURCE_FILE="$SOURCE" SOURCE_NAME="$SOURCE_NAME" SOURCE_SHA="$SOURCE_SHA" SOURCE_SLUG="$SOURCE_SLUG" bash -lc '
+            set -Eeuo pipefail
+            APP="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
+            cd "$APP"
+            test -f package.json
+            test -f src/scripts/import-supplier-price.js
+            test -f src/scripts/apply-supplier-price.js
+
+            echo "[1/6] migrations"
+            npm run migrate
+
+            echo "[2/6] preflight supplier source"
+            node --input-type=module <<"NODE"
+            import "dotenv/config";
+            import { getDb } from "./src/lib/db.js";
+            const db=getDb();
+            try{
+              const [s]=await db.execute("SELECT id,slug,status FROM suppliers WHERE slug=? LIMIT 1",[process.env.SOURCE_SLUG]);
+              if(!s[0]) throw new Error("SOURCE_SUPPLIER_MISSING");
+              console.log(JSON.stringify({supplier:s[0]}));
+            } finally { await db.end(); }
+            NODE
+
+            echo "[3/6] backup database"
+            STAMP="$(date +%Y%m%d_%H%M%S)"
+            BACKUP_DIR="$HOME/backups/catalog_import_${STAMP}"
+            mkdir -p "$BACKUP_DIR"
+            chmod 700 "$BACKUP_DIR"
+            DUMP="$(command -v mariadb-dump || command -v mysqldump || true)"
+            test -n "$DUMP"
+            CNF="$BACKUP_DIR/mysql-client.cnf"
+            node --input-type=module - "$CNF" <<"NODE"
+            import "dotenv/config";
+            import fs from "node:fs";
+            const target=process.argv[2];
+            for(const k of ["DB_USER","DB_PASSWORD","DB_NAME"]) if(!process.env[k]) throw new Error(`${k}_MISSING`);
+            const esc=v=>String(v).replace(/\\/g,"\\\\").replace(/"/g,"\\\"");
+            fs.writeFileSync(target,["[client]",`host=\"${esc(process.env.DB_HOST||"127.0.0.1")}\"`,`port=${Number(process.env.DB_PORT||3306)}`,`user=\"${esc(process.env.DB_USER)}\"`,`password=\"${esc(process.env.DB_PASSWORD)}\"`].join("\n")+"\n",{mode:0o600});
+            NODE
+            DB_NAME="$(node --input-type=module -e "import \"dotenv/config\"; process.stdout.write(process.env.DB_NAME||\"\")")"
+            "$DUMP" --defaults-extra-file="$CNF" --single-transaction --quick --skip-lock-tables --routines --triggers "$DB_NAME" | gzip -9 > "$BACKUP_DIR/database-before.sql.gz"
+            rm -f "$CNF"
+            test -s "$BACKUP_DIR/database-before.sql.gz"
+            echo "$SOURCE_SHA" > "$BACKUP_DIR/source-sha256.txt"
+            echo "BACKUP=$BACKUP_DIR/database-before.sql.gz"
+
+            echo "[4/6] stage catalog"
+            npm run supplier-price:import -- --file "$SOURCE_FILE" --source-name "$SOURCE_NAME" --supplier-slug "$SOURCE_SLUG" --expected-sha256 "$SOURCE_SHA" | tee "$BACKUP_DIR/stage.json"
+
+            echo "[5/6] apply catalog"
+            npm run supplier-price:apply -- --source-name "$SOURCE_NAME" --confirm | tee "$BACKUP_DIR/apply.json"
+
+            echo "[6/6] verify database totals"
+            node --input-type=module <<"NODE" | tee "$BACKUP_DIR/verify.json"
+            import "dotenv/config";
+            import { getDb } from "./src/lib/db.js";
+            const db=getDb();
+            const sha=process.env.SOURCE_SHA;
+            const slug=process.env.SOURCE_SLUG;
+            try{
+              const [[sup]]=await db.execute("SELECT id FROM suppliers WHERE slug=? LIMIT 1",[slug]);
+              if(!sup) throw new Error("SOURCE_SUPPLIER_MISSING_AFTER_APPLY");
+              const [[imp]]=await db.execute("SELECT id,status,row_count,category_count,matched_count,conflict_count FROM supplier_price_imports WHERE source_checksum_sha256=? ORDER BY id DESC LIMIT 1",[sha]);
+              if(!imp) throw new Error("IMPORT_MISSING_AFTER_APPLY");
+              const [[rows]]=await db.execute("SELECT COUNT(*) c,COUNT(DISTINCT source_code) codes,COUNT(DISTINCT category_name) cats,SUM(match_status=\"exact\" AND review_status=\"approved\" AND matched_variant_id IS NOT NULL) exacts FROM supplier_price_rows WHERE import_id=?",[imp.id]);
+              const [[products]]=await db.execute("SELECT COUNT(*) c FROM products WHERE supplier_id=? AND status=\"active\"",[sup.id]);
+              const [[variants]]=await db.execute("SELECT COUNT(*) c,COUNT(DISTINCT v.external_code) codes,SUM(v.public_price<=0) bad_prices FROM product_variants v JOIN products p ON p.id=v.product_id WHERE p.supplier_id=? AND v.status=\"active\"",[sup.id]);
+              const [[cats]]=await db.execute("SELECT COUNT(DISTINCT category_id) c FROM products WHERE supplier_id=? AND status=\"active\"",[sup.id]);
+              const out={ok:true,import_id:Number(imp.id),status:imp.status,source_rows:Number(rows.c),unique_source_codes:Number(rows.codes),source_categories:Number(rows.cats),exact_matches:Number(rows.exacts||0),products:Number(products.c),variants:Number(variants.c),unique_variant_codes:Number(variants.codes),categories:Number(cats.c),bad_public_prices:Number(variants.bad_prices||0)};
+              const expected={status:"applied",source_rows:21329,unique_source_codes:21329,source_categories:140,exact_matches:21329,products:1075,variants:21329,unique_variant_codes:21329,categories:140,bad_public_prices:0};
+              for(const [k,v] of Object.entries(expected)) if(out[k]!==v) throw Object.assign(new Error("CATALOG_VERIFY_FAILED"),{details:{key:k,expected:v,actual:out[k],out}});
+              console.log(JSON.stringify(out,null,2));
+              await db.execute("INSERT INTO app_settings (`key`,`value_json`) VALUES (?,?) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json),updated_at=NOW()",["catalog.last_verified",JSON.stringify({...out,source_sha256:sha,verified_at:new Date().toISOString()})]);
+            } catch(e) {
+              console.error(JSON.stringify({ok:false,error:e.message,details:e.details||null},null,2));
+              process.exitCode=1;
+            } finally { await db.end(); }
+            NODE
+          '
+
+          rm -f "$SOURCE"
+          echo 'CATALOG_LOAD_COMPLETED'
