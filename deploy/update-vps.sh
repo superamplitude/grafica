@@ -21,6 +21,38 @@ mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 cd "$APP_DIR"
 
+recover_runtime_env(){
+  if [ -n "${DB_NAME:-}" ] && [ -n "${DB_USER:-}" ]; then
+    log "Ambiente de banco ja disponivel para o deploy."
+    return 0
+  fi
+  local proc cwd comm entry key value
+  for proc in /proc/[0-9]*; do
+    [ -r "$proc/environ" ] || continue
+    cwd="$(readlink -f "$proc/cwd" 2>/dev/null || true)"
+    [ "$cwd" = "$APP_DIR" ] || continue
+    comm="$(cat "$proc/comm" 2>/dev/null || true)"
+    [ "$comm" = "node" ] || continue
+    while IFS= read -r -d '' entry; do
+      key="${entry%%=*}"
+      value="${entry#*=}"
+      case "$key" in
+        NODE_ENV|APP_NAME|APP_URL|HOST|PORT|DB_REQUIRED|DB_HOST|DB_PORT|DB_NAME|DB_USER|DB_PASSWORD|R2_REQUIRED|R2_ACCOUNT_ID|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|R2_PUBLIC_BUCKET|R2_PRIVATE_BUCKET|R2_PUBLIC_BASE_URL|JWT_SECRET)
+          printf -v "$key" '%s' "$value"
+          export "$key"
+          ;;
+      esac
+    done < "$proc/environ"
+    if [ -n "${DB_NAME:-}" ] && [ -n "${DB_USER:-}" ]; then
+      log "Ambiente operacional recuperado do processo Central Prints ativo sem expor credenciais."
+      return 0
+    fi
+  done
+  fail "Nao foi possivel recuperar DB_NAME/DB_USER do processo Central Prints ativo. Deploy bloqueado antes de qualquer alteracao."
+}
+
+recover_runtime_env
+
 PREVIOUS="$(git_safe rev-parse HEAD)"
 PREVIOUS_HAS_PREFLIGHT=0
 if [ -f ecosystem.config.cjs ] && grep -q "central-prints-preflight" ecosystem.config.cjs; then PREVIOUS_HAS_PREFLIGHT=1; fi
@@ -62,7 +94,7 @@ npm run schema:verify
 log "Registrando referencias externas em quarentena"
 npm run reference:import | tee "$BACKUP_DIR/reference-import.json"
 if [ -f "ops/catalog-import/2026-09-12/manifest.json" ]; then
-  log "Importando catalogo integral empacotado com backup e checksum"
+  log "Importando catalogo integral com backup e checksum"
   bash deploy/import-bundled-catalog.sh | tee "$BACKUP_DIR/catalog-import.log"
 fi
 log "Reiniciando Central Prints na porta local $APP_PORT"

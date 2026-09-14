@@ -4,6 +4,8 @@ set -Eeuo pipefail
 APP_DIR="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
 PAYLOAD_DIR="$APP_DIR/ops/catalog-import/2026-09-12"
 MANIFEST="$PAYLOAD_DIR/manifest.json"
+LOCAL_SOURCE_DEFAULT="/home/belastock-grafica/.central-prints-import/CentralPrints-TabelaPreco-2026-09-12.xls"
+LOCAL_SOURCE="${CENTRAL_PRINTS_CATALOG_SOURCE:-$LOCAL_SOURCE_DEFAULT}"
 STATE_DIR="/var/lib/central-prints-autodeploy"
 BACKUP_ROOT="/home/belastock-grafica/backups"
 STAMP="$(date +%Y%m%d_%H%M%S)"
@@ -14,8 +16,8 @@ log(){ printf '[catalog-import] %s\n' "$*"; }
 fail(){ printf '[catalog-import][ERRO] %s\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || fail "Execute como root."
-[ -f "$MANIFEST" ] || { log "Sem payload de catalogo; nada a fazer."; exit 0; }
-for cmd in node npm sha256sum base64 gzip; do command -v "$cmd" >/dev/null 2>&1 || fail "Comando ausente: $cmd"; done
+[ -f "$MANIFEST" ] || { log "Sem manifesto de catalogo; nada a fazer."; exit 0; }
+for cmd in node npm sha256sum gzip; do command -v "$cmd" >/dev/null 2>&1 || fail "Comando ausente: $cmd"; done
 cd "$APP_DIR"
 
 read_manifest(){ node --input-type=module - "$MANIFEST" "$1" <<'NODE'
@@ -51,28 +53,39 @@ if [ -f "$STATE_FILE" ]; then
   exit 0
 fi
 
-B64="$TMP_DIR/source.br.b64"
-BR="$TMP_DIR/source.br"
 RAW="$TMP_DIR/source.xls"
-: > "$B64"
-FOUND=0
-while IFS= read -r part; do cat "$part" >> "$B64"; FOUND=$((FOUND+1)); done < <(find "$PAYLOAD_DIR" -maxdepth 1 -type f -name 'part-*.b64' | sort)
-[ "$FOUND" -eq "$PARTS" ] || fail "Esperadas $PARTS partes; encontradas $FOUND."
-base64 -d "$B64" > "$BR"
-ACTUAL_COMPRESSED_BYTES="$(wc -c < "$BR" | tr -d ' ')"
-[ "$ACTUAL_COMPRESSED_BYTES" = "$COMPRESSED_BYTES" ] || fail "Tamanho comprimido divergente: $ACTUAL_COMPRESSED_BYTES"
-printf '%s  %s\n' "$COMPRESSED_SHA" "$BR" | sha256sum -c - >/dev/null
+if [ -f "$LOCAL_SOURCE" ]; then
+  log "Usando fonte integral persistida na VPS."
+  cp "$LOCAL_SOURCE" "$RAW"
+  ACTUAL_SOURCE_BYTES="$(wc -c < "$RAW" | tr -d ' ')"
+  [ "$ACTUAL_SOURCE_BYTES" = "$SOURCE_BYTES" ] || fail "Tamanho da fonte local divergente: $ACTUAL_SOURCE_BYTES"
+  printf '%s  %s\n' "$SOURCE_SHA" "$RAW" | sha256sum -c - >/dev/null
+  log "Fonte local verificada: $SOURCE_SHA"
+else
+  for cmd in base64; do command -v "$cmd" >/dev/null 2>&1 || fail "Comando ausente: $cmd"; done
+  B64="$TMP_DIR/source.br.b64"
+  BR="$TMP_DIR/source.br"
+  : > "$B64"
+  FOUND=0
+  while IFS= read -r part; do cat "$part" >> "$B64"; FOUND=$((FOUND+1)); done < <(find "$PAYLOAD_DIR" -maxdepth 1 -type f -name 'part-*.b64' | sort)
+  [ "$FOUND" -eq "$PARTS" ] || fail "Fonte local ausente e payload incompleto: esperadas $PARTS partes; encontradas $FOUND."
+  base64 -d "$B64" > "$BR"
+  ACTUAL_COMPRESSED_BYTES="$(wc -c < "$BR" | tr -d ' ')"
+  [ "$ACTUAL_COMPRESSED_BYTES" = "$COMPRESSED_BYTES" ] || fail "Tamanho comprimido divergente: $ACTUAL_COMPRESSED_BYTES"
+  printf '%s  %s\n' "$COMPRESSED_SHA" "$BR" | sha256sum -c - >/dev/null
 
-node --input-type=module - "$BR" "$RAW" <<'NODE'
+  node --input-type=module - "$BR" "$RAW" <<'NODE'
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 const [, , source, target]=process.argv;
 fs.writeFileSync(target,zlib.brotliDecompressSync(fs.readFileSync(source)),{mode:0o600});
 NODE
-ACTUAL_SOURCE_BYTES="$(wc -c < "$RAW" | tr -d ' ')"
-[ "$ACTUAL_SOURCE_BYTES" = "$SOURCE_BYTES" ] || fail "Tamanho original divergente: $ACTUAL_SOURCE_BYTES"
-printf '%s  %s\n' "$SOURCE_SHA" "$RAW" | sha256sum -c - >/dev/null
-log "Payload reconstruido e verificado: $SOURCE_SHA"
+  ACTUAL_SOURCE_BYTES="$(wc -c < "$RAW" | tr -d ' ')"
+  [ "$ACTUAL_SOURCE_BYTES" = "$SOURCE_BYTES" ] || fail "Tamanho original divergente: $ACTUAL_SOURCE_BYTES"
+  printf '%s  %s\n' "$SOURCE_SHA" "$RAW" | sha256sum -c - >/dev/null
+  log "Payload reconstruido e verificado: $SOURCE_SHA"
+fi
+chmod 600 "$RAW"
 
 DUMP_CMD="$(command -v mariadb-dump || command -v mysqldump || true)"
 [ -n "$DUMP_CMD" ] || fail "mariadb-dump/mysqldump ausente; importacao em massa bloqueada sem backup."

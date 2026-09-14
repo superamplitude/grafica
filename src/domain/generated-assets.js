@@ -58,7 +58,7 @@ export function renderVariantGabaritoSvg({code,productName,sizeLabel,printConfig
   <rect x="15" y="105" width="180" height="90" fill="#f9fafb" stroke="#9ca3af" stroke-width="0.5" stroke-dasharray="3 2"/>
   <text x="105" y="145" text-anchor="middle" font-family="Arial,sans-serif" font-size="6" fill="#6b7280">Medida não convertível automaticamente em milímetros.</text>
   <text x="105" y="158" text-anchor="middle" font-family="Arial,sans-serif" font-size="4.5" fill="#6b7280">Use a medida textual acima e confirme acabamento/sangria antes da produção.</text>
-  <text x="15" y="255" font-family="Arial,sans-serif" font-size="4" fill="#6b7280">Origem dimensional: tabela de preços importada. Nenhuma sangria ou área segura foi presumida.</text>
+  <text x="15" y="255" font-family="Arial,sans-serif" font-size="4" fill="#6b7280">Origem dimensional: tabela de preços importada. Sangria/área segura não presumidas.</text>
 </svg>`;
   }
 
