@@ -9,8 +9,13 @@ export async function stageSupplierPriceBuffer(db,buffer,options={}){
   const supplierId=options.supplier_id==null?null:Number(options.supplier_id);
   if(supplierId!==null && (!Number.isInteger(supplierId)||supplierId<=0))throw new Error('INVALID_SUPPLIER_ID');
   if(supplierId){const [supplierRows]=await db.execute('SELECT id FROM suppliers WHERE id=? LIMIT 1',[supplierId]);if(!supplierRows.length)throw new Error('SUPPLIER_NOT_FOUND');}
-  const [existing]=await db.execute('SELECT id,status,row_count,category_count,matched_count,conflict_count FROM supplier_price_imports WHERE source_checksum_sha256=? LIMIT 1',[parsed.checksum_sha256]);
-  if(existing[0])return {ok:true,idempotent:true,import_id:Number(existing[0].id),checksum_sha256:parsed.checksum_sha256,row_count:Number(existing[0].row_count),category_count:Number(existing[0].category_count),matched_count:Number(existing[0].matched_count||0),conflict_count:Number(existing[0].conflict_count||0),status:existing[0].status,automatic_apply:false};
+  const [existing]=await db.execute('SELECT id,supplier_id,status,row_count,category_count,matched_count,conflict_count FROM supplier_price_imports WHERE source_checksum_sha256=? LIMIT 1',[parsed.checksum_sha256]);
+  if(existing[0]){
+    const previousSupplier=existing[0].supplier_id==null?null:Number(existing[0].supplier_id);
+    if(supplierId&&previousSupplier&&previousSupplier!==supplierId)throw new Error('PRICE_IMPORT_SUPPLIER_CONFLICT');
+    if(supplierId&&!previousSupplier&&existing[0].status!=='applied'&&existing[0].status!=='rejected')await db.execute('UPDATE supplier_price_imports SET supplier_id=? WHERE id=? AND supplier_id IS NULL',[supplierId,existing[0].id]);
+    return {ok:true,idempotent:true,import_id:Number(existing[0].id),checksum_sha256:parsed.checksum_sha256,row_count:Number(existing[0].row_count),category_count:Number(existing[0].category_count),matched_count:Number(existing[0].matched_count||0),conflict_count:Number(existing[0].conflict_count||0),status:existing[0].status,automatic_apply:false};
+  }
   const conn=await db.getConnection();
   try{
     await conn.beginTransaction();
