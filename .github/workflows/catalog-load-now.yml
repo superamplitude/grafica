@@ -9,32 +9,26 @@ permissions:
   contents: read
 
 jobs:
-  discover-zap-table:
+  probe-drive-source:
     runs-on: [self-hosted, central-prints, vps, production]
     timeout-minutes: 10
     steps:
-      - name: Descobrir endpoint real da tabela pública Zap
+      - name: Testar exportação pública da tabela no Google Drive
         shell: bash
         run: |
           set -Eeuo pipefail
-          URL='https://www.zapgrafica.com.br/tabelaprecos/tabelaprecosxls'
-          OUT="$RUNNER_TEMP/zap-page.html"
-          curl -fLksS --max-time 120 "$URL" -o "$OUT"
-          echo "BYTES=$(wc -c < "$OUT" | tr -d ' ')"
-          python3 - "$OUT" <<'PY'
-          import sys,re,html
-          s=open(sys.argv[1],'rb').read().decode('utf-8','ignore')
-          print('TITLE=',re.sub(r'\s+',' ',re.search(r'<title[^>]*>(.*?)</title>',s,re.I|re.S).group(1)).strip() if re.search(r'<title[^>]*>(.*?)</title>',s,re.I|re.S) else 'NONE')
-          vals=[]
-          for pat in [r'href=["\']([^"\']+)["\']',r'src=["\']([^"\']+)["\']',r'action=["\']([^"\']+)["\']',r'https?://[^"\'\s<>]+']:
-              vals += re.findall(pat,s,re.I)
-          seen=set()
-          for v in vals:
-              v=html.unescape(v)
-              if v in seen: continue
-              seen.add(v)
-              if re.search(r'(xls|csv|tabela|preco|download|export)',v,re.I): print('LINK='+v[:1000])
-          for m in re.finditer(r'.{0,180}(xls|csv|download|export|tabela.?pre[cç]o).{0,300}',s,re.I|re.S):
-              x=re.sub(r'\s+',' ',m.group(0))
-              print('CTX='+x[:600])
-          PY
+          ID='1sFgDMU0TXl-S4y-jbai-6eV5XE6WC2kS'
+          for kind in xlsx csv; do
+            if [ "$kind" = xlsx ]; then
+              URL="https://docs.google.com/spreadsheets/d/$ID/export?format=xlsx"
+            else
+              URL="https://docs.google.com/spreadsheets/d/$ID/export?format=csv&gid=0"
+            fi
+            OUT="$RUNNER_TEMP/drive-source.$kind"
+            code="$(curl -LksS --max-time 120 -o "$OUT" -w '%{http_code}' "$URL" || true)"
+            echo "KIND=$kind HTTP=$code BYTES=$(wc -c < "$OUT" 2>/dev/null || echo 0)"
+            file "$OUT" 2>/dev/null || true
+            sha256sum "$OUT" 2>/dev/null || true
+            head -c 120 "$OUT" 2>/dev/null | tr '\n\r' '  ' | sed 's/[^[:print:]\t]/./g' || true
+            echo
+          done
