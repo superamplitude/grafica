@@ -1,5 +1,5 @@
 import { calculatePrice } from './pricing.js';
-import { buildCatalogGroups, displayCase, slugifyCatalog } from './catalog-import.js';
+import { buildCatalogGroups, displayCase, normalizeDescription, slugifyCatalog } from './catalog-import.js';
 
 const PUBLIC_RULE={calculation_method:'real_margin_percentage',calculation_value:35,minimum_margin:10,rounding_rule:'ending_90'};
 const RESELLER_RULE={calculation_method:'real_margin_percentage',calculation_value:18,minimum_margin:10,rounding_rule:'ending_90'};
@@ -11,6 +11,41 @@ function stagedToRaw(row){
     String(row.color_configuration||''),String(row.weight_value??''),String(row.quantity_value??''),
     String(row.size_label||''),String(row.production_days??''),`R$ ${Number(row.supplier_price||0).toFixed(2).replace('.',',')}`
   ];
+}
+
+function uniqueClean(values){return [...new Set(values.map(v=>String(v??'').trim()).filter(Boolean))];}
+function numericRange(values){
+  const nums=values.map(v=>Number(v)).filter(v=>Number.isFinite(v)&&v>0);
+  if(!nums.length)return {min:null,max:null};
+  return {min:Math.min(...nums),max:Math.max(...nums)};
+}
+function listText(values,max=8){
+  const items=uniqueClean(values);
+  if(!items.length)return null;
+  const shown=items.slice(0,max);
+  return shown.join(', ')+(items.length>max?` e mais ${items.length-max} opção(ões)`:``);
+}
+function buildProductCopy(group){
+  const category=displayCase(group.category);
+  const core=displayCase(normalizeDescription(group.category,group.description));
+  const sizes=uniqueClean(group.rows.map(r=>r[6]).filter(v=>!/^0\s*[xX×]\s*0(?:\s*mm)?$/i.test(String(v||'').trim())));
+  const prints=uniqueClean(group.rows.map(r=>String(r[3]||'').toUpperCase()));
+  const qty=numericRange(group.rows.map(r=>r[5]));
+  const days=numericRange(group.rows.map(r=>r[7]));
+  const variants=group.rows.length;
+  const facts=[];
+  if(sizes.length) facts.push(`formatos cadastrados: ${listText(sizes,10)}`);
+  if(prints.length) facts.push(`configurações de impressão: ${listText(prints,8)}`);
+  if(qty.min!==null) facts.push(qty.min===qty.max?`quantidade cadastrada: ${qty.min} unidade(s)`:`quantidades de ${qty.min} a ${qty.max} unidade(s)`);
+  if(days.min!==null) facts.push(days.min===days.max?`prazo informado: ${days.min} dia(s)`:`prazos informados de ${days.min} a ${days.max} dia(s)`);
+  const short=`${core}. ${variants} opção(ões) cadastrada(s) para você escolher formato, impressão, quantidade e prazo disponíveis.`;
+  const detail=facts.length?` A tabela importada informa ${facts.join('; ')}.`:'';
+  const description=`${core} é um produto personalizável da categoria ${category}. Há ${variants} opção(ões) cadastrada(s).${detail} Selecione uma opção para consultar o preço público, a medida, a configuração de impressão e o prazo correspondentes. As especificações exibidas são derivadas diretamente da tabela de preços importada; características não presentes na fonte, como sangria, área segura, material ou acabamento específico, não são presumidas.`;
+  return {
+    short_description:short.slice(0,1400),
+    description:description.slice(0,6000),
+    metadata:{variant_count:variants,sizes,print_configurations:prints,quantity_min:qty.min,quantity_max:qty.max,production_days_min:days.min,production_days_max:days.max}
+  };
 }
 
 export async function applySupplierPriceImport(conn,{importId,actorId,confirmApply=false}){
@@ -29,19 +64,19 @@ export async function applySupplierPriceImport(conn,{importId,actorId,confirmApp
   const categoryIds=new Map(); let sort=0;
   for(const rawCategory of categories){
     const slug=slugifyCatalog(rawCategory,190); const name=displayCase(rawCategory);
-    await conn.execute(`INSERT INTO categories (name,slug,description,status,sort_order) VALUES (?,?,?,'active',?) ON DUPLICATE KEY UPDATE name=VALUES(name),status='active'`,[name,slug,`Produtos gráficos da categoria ${name}.`,sort++]);
+    await conn.execute(`INSERT INTO categories (name,slug,description,status,sort_order) VALUES (?,?,?,'active',?) ON DUPLICATE KEY UPDATE name=VALUES(name),description=VALUES(description),status='active'`,[name,slug,`Produtos gráficos da categoria ${name}. Consulte as opções publicadas de formato, impressão, quantidade e prazo.`,sort++]);
     const [[cat]]=await conn.execute('SELECT id FROM categories WHERE slug=? LIMIT 1',[slug]); categoryIds.set(rawCategory,Number(cat.id));
   }
   let products=0,variants=0,publicChanges=0,resellerChanges=0;
   for(const group of groups){
     const categoryId=categoryIds.get(group.category);
     const featured=FEATURED.has(group.category)?1:0;
-    const summary=`${displayCase(group.description)}. Escolha quantidade, formato, impressão e prazo entre as opções disponíveis.`.slice(0,5000);
-    const cfg=JSON.stringify({catalog_source_managed:true,source:{import_id:importId,supplier_id:Number(imp.supplier_id),supplier_slug:imp.supplier_slug||null,source_checksum_sha256:imp.source_checksum_sha256},catalog:{variant_count:group.rows.length}});
+    const copy=buildProductCopy(group);
+    const cfg=JSON.stringify({catalog_source_managed:true,source:{import_id:importId,supplier_id:Number(imp.supplier_id),supplier_slug:imp.supplier_slug||null,source_checksum_sha256:imp.source_checksum_sha256},catalog:copy.metadata});
     await conn.execute(`INSERT INTO products (category_id,supplier_id,sku,name,slug,short_description,description,base_price,status,featured,sort_order,requires_artwork,supports_front,supports_back,config_json)
       VALUES (?,?,?,?,?,?,?,0,'active',?,0,1,1,?,?)
       ON DUPLICATE KEY UPDATE category_id=VALUES(category_id),supplier_id=VALUES(supplier_id),name=VALUES(name),slug=VALUES(slug),short_description=VALUES(short_description),description=VALUES(description),status='active',featured=VALUES(featured),supports_front=1,supports_back=VALUES(supports_back),config_json=VALUES(config_json),updated_at=NOW()`,
-      [categoryId,Number(imp.supplier_id),group.sku,group.name,group.slug,summary,`Produto gráfico personalizável da categoria ${displayCase(group.category)}.`,featured,Number(group.supports_back),cfg]);
+      [categoryId,Number(imp.supplier_id),group.sku,group.name,group.slug,copy.short_description,copy.description,featured,Number(group.supports_back),cfg]);
     const [[product]]=await conn.execute('SELECT id FROM products WHERE sku=? LIMIT 1',[group.sku]); const productId=Number(product.id); products++;
     let minPrice=null;
     for(const row of group.rows){
