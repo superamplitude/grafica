@@ -8,32 +8,18 @@ permissions:
   contents: read
 
 jobs:
-  diagnose-process:
+  catalog-status:
     runs-on: [self-hosted, central-prints, vps, production]
     timeout-minutes: 10
     steps:
-      - name: Diagnosticar processo e serviço sem ler segredos
+      - name: Consultar catálogo atual e conexão da aplicação
         shell: bash
         run: |
           set -Eeuo pipefail
           SOURCE='/tmp/CentralPrints-TabelaPreco-2026-09-12.xls'
-          [ -f "$SOURCE" ] && echo 'SOURCE_PRESENT=YES' || echo 'SOURCE_PRESENT=NO'
-          echo 'PROCESSES_BEGIN'
-          ps -eo pid,ppid,user,lstart,args | grep -E 'grafica\.belastock\.com\.br|src/server\.js|preflight-worker\.js' | grep -v grep || true
-          echo 'PROCESSES_END'
-          echo 'SERVICE_UNITS_BEGIN'
-          systemctl list-units --type=service --all --no-pager 2>/dev/null | grep -Ei 'central|print|grafica|node' | head -50 || true
-          echo 'SERVICE_UNITS_END'
-          echo 'SERVICE_FILES_BEGIN'
-          find /etc/systemd/system /lib/systemd/system /etc/systemd/user -maxdepth 2 -type f \( -iname '*central*' -o -iname '*print*' -o -iname '*grafica*' -o -iname '*node*' \) -readable -print 2>/dev/null | head -100 || true
-          echo 'SERVICE_FILES_END'
-          echo 'LOCAL_STATUS_BEGIN'
-          for port in 3005 3210; do
-            echo "PORT=$port"
-            for path in /api/v1/status /health /api/v1/health /; do
-              code="$(curl -ksS --max-time 5 -o /tmp/cp-status.out -w '%{http_code}' "http://127.0.0.1:$port$path" || true)"
-              echo "PATH=$path HTTP=$code BODY_BYTES=$(wc -c < /tmp/cp-status.out 2>/dev/null || echo 0)"
-              head -c 600 /tmp/cp-status.out 2>/dev/null | tr '\n' ' ' || true; echo
-            done
+          [ -f "$SOURCE" ] && echo "SOURCE_PRESENT=YES SHA=$(sha256sum "$SOURCE" | awk '{print $1}')" || echo 'SOURCE_PRESENT=NO'
+          for path in /api/v1/catalog/summary /api/v1/categories '/api/v1/products?limit=1'; do
+            code="$(curl -ksS --max-time 10 -o /tmp/cp-api.out -w '%{http_code}' "http://127.0.0.1:3005$path" || true)"
+            echo "PATH=$path HTTP=$code BODY_BYTES=$(wc -c < /tmp/cp-api.out 2>/dev/null || echo 0)"
+            head -c 2000 /tmp/cp-api.out 2>/dev/null | tr '\n' ' ' || true; echo
           done
-          echo 'LOCAL_STATUS_END'
