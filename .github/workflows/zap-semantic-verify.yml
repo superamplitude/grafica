@@ -1,0 +1,57 @@
+name: Central Prints ZAP Semantic Verify
+
+on:
+  push:
+    branches: [ops/zap-semantic-verify]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: [self-hosted, central-prints, vps, production]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download and compare ZAP public table semantically
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p zap-evidence
+          curl -LksS --max-time 120 'https://www.zapgrafica.com.br/tabelaprecos/tabelaprecosxls' -o zap-evidence/zap.xls
+          node --input-type=module <<'NODE' | tee zap-evidence/semantic.json
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import { parseHtmlXlsPriceTable } from './src/domain/supplier-price-parser.js';
+          const TARGET='25654213e3369dbdfd210404d228a3e773b81d68c70fb63395d035362b93f437';
+          const parsed=parseHtmlXlsPriceTable(fs.readFileSync('zap-evidence/zap.xls'));
+          const rows=parsed.rows.map(r=>[
+            r.raw_json.code,r.raw_json.category,r.raw_json.description,r.raw_json.colors,
+            r.raw_json.weight,r.raw_json.quantity,r.raw_json.size,r.raw_json.lead_time,r.raw_json.price
+          ]).sort((a,b)=>a[0].localeCompare(b[0]));
+          const canonical=rows.map(r=>r.join('\x1f')).join('\n');
+          const semantic=crypto.createHash('sha256').update(canonical,'utf8').digest('hex');
+          const result={
+            source_sha256:parsed.checksum_sha256,
+            source_date:parsed.source_date,
+            rows:parsed.row_count,
+            categories:parsed.category_count,
+            semantic_sha256:semantic,
+            target_semantic_sha256:TARGET,
+            semantic_match:semantic===TARGET,
+            first:rows[0],
+            last:rows.at(-1)
+          };
+          console.log(JSON.stringify(result,null,2));
+          if(semantic!==TARGET)process.exitCode=3;
+          NODE
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-semantic-evidence
+          path: zap-evidence/
+          retention-days: 3
