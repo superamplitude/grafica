@@ -9,27 +9,40 @@ permissions:
   contents: read
 
 jobs:
-  locate-source:
+  locate-install:
     runs-on: [self-hosted, central-prints, vps, production]
     timeout-minutes: 10
     steps:
-      - name: Localizar fonte ou payload já existente na VPS
+      - name: Localizar instalação, fonte e estado do Central Prints
         shell: bash
         run: |
           set -Eeuo pipefail
           TARGET_SHA="c2a7f6b55d41467851195867e3a6cdfe351f38e947afef2ca7e60045ad62c2c5"
           BR_SHA="59a15139e462cb05bf4332caaa8e51e11f3605a64bd2dee006c2067f602f8e2e"
           echo "RUNNER=$(whoami) HOST=$(hostname)"
+          getent passwd belastock-grafica | sed -E 's/:x:[0-9]+:[0-9]+:/:x:UID:GID:/' || true
           echo "SUDO_SITE_USER=$(sudo -n -u belastock-grafica true 2>/dev/null && echo OK || echo NO)"
-          OUT="$RUNNER_TEMP/catalog-candidates.txt"
-          : > "$OUT"
-          for root in /home/belastock-grafica /opt/actions-runner-central-prints /tmp; do
+          echo '=== CANDIDATOS DE APP ==='
+          for root in /home /var/www /opt; do
+            [ -e "$root" ] || continue
+            find "$root" -maxdepth 6 -type d \( -name 'grafica.belastock.com.br' -o -iname '*central*prints*' -o -iname '*belastock*grafica*' \) -print 2>/dev/null | head -100 || true
+          done
+          echo '=== REPOS GIT RELACIONADOS ==='
+          for root in /home /var/www /opt/actions-runner-central-prints; do
+            [ -e "$root" ] || continue
+            find "$root" -maxdepth 7 -type d -name .git -print 2>/dev/null | grep -Ei 'grafica|print|belastock' | head -100 || true
+          done
+          echo '=== PROCESSOS/PORTAS ==='
+          ps -eo user:24,pid,cmd | grep -Ei 'central-prints|grafica|node .*server' | grep -v grep | head -100 || true
+          ss -ltnp 2>/dev/null | grep -E ':(3005|3210)\b' || true
+          echo '=== FONTE/PAYLOAD ==='
+          OUT="$RUNNER_TEMP/catalog-candidates.txt"; : > "$OUT"
+          for root in /home /opt/actions-runner-central-prints /tmp; do
             [ -e "$root" ] || continue
             find "$root" -xdev -type f \( -iname 'TabelaPreco*.xls' -o -iname '*catalog*.xls' -o -size 15835682c -o -size 245615c \) -print 2>/dev/null >> "$OUT" || true
           done
           sort -u "$OUT" -o "$OUT"
-          FOUND_SOURCE=""
-          FOUND_BR=""
+          FOUND_SOURCE=""; FOUND_BR=""
           while IFS= read -r f; do
             [ -f "$f" ] || continue
             bytes="$(wc -c < "$f" | tr -d ' ')"
@@ -38,20 +51,5 @@ jobs:
             [ "$sha" = "$TARGET_SHA" ] && FOUND_SOURCE="$f"
             [ "$sha" = "$BR_SHA" ] && FOUND_BR="$f"
           done < "$OUT"
-          if [ -n "$FOUND_SOURCE" ]; then
-            echo "CATALOG_SOURCE_FOUND=$FOUND_SOURCE"
-          else
-            echo "CATALOG_SOURCE_FOUND=NO"
-          fi
-          if [ -n "$FOUND_BR" ]; then
-            echo "CATALOG_BROTLI_FOUND=$FOUND_BR"
-          else
-            echo "CATALOG_BROTLI_FOUND=NO"
-          fi
-          APP=/home/belastock-grafica/htdocs/grafica.belastock.com.br
-          if [ -d "$APP" ]; then
-            echo "APP_PRESENT=YES"
-            find "$APP/ops/catalog-import/2026-09-12" -maxdepth 1 -type f -printf '%f %s\n' 2>/dev/null | sort || true
-          else
-            echo "APP_PRESENT=NO"
-          fi
+          echo "CATALOG_SOURCE_FOUND=${FOUND_SOURCE:-NO}"
+          echo "CATALOG_BROTLI_FOUND=${FOUND_BR:-NO}"
