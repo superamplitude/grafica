@@ -23,10 +23,12 @@ function updateCartCount(){document.querySelector('#cartCount').textContent=cart
 async function getJson(url){const r=await fetch(url,{headers:{Accept:'application/json'}});if(!r.ok)throw new Error(`HTTP_${r.status}`);return r.json();}
 
 function card(item){
- const image=item.cover_url?`<img src="${esc(item.cover_url)}" alt="${esc(item.name)}" loading="lazy">`:'<span class="image-placeholder" aria-hidden="true"></span>';
+ const visual=item.image_url||item.cover_url||item.technical_preview_url;
+ const image=visual?`<img src="${esc(visual)}" alt="${esc(item.name)}" loading="lazy">`:'<span class="image-placeholder" aria-hidden="true"></span>';
+ const visualBadge=item.image_type==='real_photo'?'<span class="visual-badge photo">Foto do produto</span>':'<span class="visual-badge technical">Imagem técnica</span>';
  const price=Number(item.starting_price||0)>0?money.format(Number(item.starting_price)):'Sob consulta';
  const variants=Number(item.variants_count||0);
- return `<article class="product-card"><a class="product-image" href="/produto.html?slug=${encodeURIComponent(item.slug)}">${image}</a><div class="product-body"><span class="badge">${item.requires_artwork?'Personalizável':'Produto gráfico'}</span><h3><a href="/produto.html?slug=${encodeURIComponent(item.slug)}">${esc(item.name)}</a></h3><p>${esc(item.short_description||'Configure as opções disponíveis para este produto.')}</p><span class="variant-count">${variants?`${variants} opção(ões) disponível(is)`:'Configuração sob consulta'}</span><div class="price"><small>${price==='Sob consulta'?'Preço':'A partir de'}</small><strong>${price}</strong></div><a class="configure" href="/produto.html?slug=${encodeURIComponent(item.slug)}">Configurar produto</a></div></article>`;
+ return `<article class="product-card"><a class="product-image" href="/produto.html?slug=${encodeURIComponent(item.slug)}">${image}${visualBadge}</a><div class="product-body"><span class="badge">${item.requires_artwork?'Personalizável':'Produto gráfico'}</span><h3><a href="/produto.html?slug=${encodeURIComponent(item.slug)}">${esc(item.name)}</a></h3><p>${esc(item.short_description||'Configure as opções disponíveis para este produto.')}</p><span class="variant-count">${variants?`${variants} opção(ões) disponível(is)`:'Configuração sob consulta'}</span><div class="price"><small>${price==='Sob consulta'?'Preço':'A partir de'}</small><strong>${price}</strong></div><div class="catalog-card-actions"><a class="configure" href="/produto.html?slug=${encodeURIComponent(item.slug)}">Configurar produto</a><a class="template-shortcut" href="${esc(item.gabaritos_url||`/api/v1/products/${encodeURIComponent(item.slug)}/generated-gabaritos`)}" target="_blank" rel="noopener">Ver gabaritos</a><a class="image-shortcut" href="${esc(visual||'#')}" target="_blank" rel="noopener" ${visual?'':'aria-disabled="true"'}>Abrir imagem</a></div></div></article>`;
 }
 
 function syncFromUrl(){
