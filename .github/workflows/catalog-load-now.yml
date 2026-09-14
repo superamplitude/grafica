@@ -8,18 +8,24 @@ permissions:
   contents: read
 
 jobs:
-  catalog-status:
+  env-source:
     runs-on: [self-hosted, central-prints, vps, production]
     timeout-minutes: 10
     steps:
-      - name: Consultar catálogo atual e conexão da aplicação
+      - name: Localizar fonte de ambiente sem expor valores
         shell: bash
         run: |
           set -Eeuo pipefail
-          SOURCE='/tmp/CentralPrints-TabelaPreco-2026-09-12.xls'
-          [ -f "$SOURCE" ] && echo "SOURCE_PRESENT=YES SHA=$(sha256sum "$SOURCE" | awk '{print $1}')" || echo 'SOURCE_PRESENT=NO'
-          for path in /api/v1/catalog/summary /api/v1/categories '/api/v1/products?limit=1'; do
-            code="$(curl -ksS --max-time 10 -o /tmp/cp-api.out -w '%{http_code}' "http://127.0.0.1:3005$path" || true)"
-            echo "PATH=$path HTTP=$code BODY_BYTES=$(wc -c < /tmp/cp-api.out 2>/dev/null || echo 0)"
-            head -c 2000 /tmp/cp-api.out 2>/dev/null | tr '\n' ' ' || true; echo
+          echo 'AUTODEPLOY_SERVICE_BEGIN'
+          systemctl show central-prints-autodeploy.service -p User -p Group -p FragmentPath -p EnvironmentFiles -p ExecStart --no-pager 2>/dev/null || true
+          echo 'AUTODEPLOY_SERVICE_END'
+          echo 'TIMER_BEGIN'
+          systemctl show central-prints-autodeploy.timer -p FragmentPath -p NextElapseUSecRealtime --no-pager 2>/dev/null || true
+          echo 'TIMER_END'
+          echo 'CANDIDATE_ENV_PATHS_BEGIN'
+          for f in /etc/default/central-prints /etc/central-prints.env /etc/central-prints/*.env /home/belastock-grafica/.env /home/belastock-grafica/htdocs/grafica.belastock.com.br/.env; do
+            [ -e "$f" ] || continue
+            printf 'PATH=%s READABLE_RUNNER=%s READABLE_SITE=%s KEYS=' "$f" "$([ -r "$f" ] && echo YES || echo NO)" "$(sudo -n -u belastock-grafica test -r "$f" 2>/dev/null && echo YES || echo NO)"
+            if [ -r "$f" ]; then grep -E '^(DB_HOST|DB_PORT|DB_NAME|DB_USER|DB_PASSWORD)=' "$f" 2>/dev/null | cut -d= -f1 | paste -sd, - || true; else echo; fi
           done
+          echo 'CANDIDATE_ENV_PATHS_END'
