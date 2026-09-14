@@ -8,34 +8,32 @@ permissions:
   contents: read
 
 jobs:
-  diagnose-runtime-env:
+  diagnose-process:
     runs-on: [self-hosted, central-prints, vps, production]
     timeout-minutes: 10
     steps:
-      - name: Localizar ambiente da aplicação sem expor credenciais
+      - name: Diagnosticar processo e serviço sem ler segredos
         shell: bash
         run: |
           set -Eeuo pipefail
           SOURCE='/tmp/CentralPrints-TabelaPreco-2026-09-12.xls'
-          EXPECTED='c2a7f6b55d41467851195867e3a6cdfe351f38e947afef2ca7e60045ad62c2c5'
-          if [ -f "$SOURCE" ]; then
-            echo "SOURCE_PRESENT=YES BYTES=$(wc -c < "$SOURCE" | tr -d ' ') SHA=$(sha256sum "$SOURCE" | awk '{print $1}')"
-          else
-            echo 'SOURCE_PRESENT=NO'
-          fi
-          sudo -n -u belastock-grafica bash -lc '
-            set -u
-            APP="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
-            cd "$APP"
-            echo "PWD=$PWD USER=$(whoami) HOME=$HOME"
-            echo "ENV_FILES_BEGIN"
-            find "$APP" "$HOME" -maxdepth 3 -type f \( -name ".env" -o -name ".env.*" -o -name "*.env" \) -readable -print 2>/dev/null | sort -u | while read -r f; do
-              printf "ENV_FILE=%s KEYS=" "$f"
-              grep -E "^(DB_HOST|DB_PORT|DB_NAME|DB_USER|DB_PASSWORD)=" "$f" 2>/dev/null | cut -d= -f1 | paste -sd, - || true
+          [ -f "$SOURCE" ] && echo 'SOURCE_PRESENT=YES' || echo 'SOURCE_PRESENT=NO'
+          echo 'PROCESSES_BEGIN'
+          ps -eo pid,ppid,user,lstart,args | grep -E 'grafica\.belastock\.com\.br|src/server\.js|preflight-worker\.js' | grep -v grep || true
+          echo 'PROCESSES_END'
+          echo 'SERVICE_UNITS_BEGIN'
+          systemctl list-units --type=service --all --no-pager 2>/dev/null | grep -Ei 'central|print|grafica|node' | head -50 || true
+          echo 'SERVICE_UNITS_END'
+          echo 'SERVICE_FILES_BEGIN'
+          find /etc/systemd/system /lib/systemd/system /etc/systemd/user -maxdepth 2 -type f \( -iname '*central*' -o -iname '*print*' -o -iname '*grafica*' -o -iname '*node*' \) -readable -print 2>/dev/null | head -100 || true
+          echo 'SERVICE_FILES_END'
+          echo 'LOCAL_STATUS_BEGIN'
+          for port in 3005 3210; do
+            echo "PORT=$port"
+            for path in /api/v1/status /health /api/v1/health /; do
+              code="$(curl -ksS --max-time 5 -o /tmp/cp-status.out -w '%{http_code}' "http://127.0.0.1:$port$path" || true)"
+              echo "PATH=$path HTTP=$code BODY_BYTES=$(wc -c < /tmp/cp-status.out 2>/dev/null || echo 0)"
+              head -c 600 /tmp/cp-status.out 2>/dev/null | tr '\n' ' ' || true; echo
             done
-            echo "ENV_FILES_END"
-            printf "CURRENT_ENV_KEYS="; env | grep -E "^(DB_HOST|DB_PORT|DB_NAME|DB_USER|DB_PASSWORD)=" | cut -d= -f1 | paste -sd, - || true
-            echo "PM2_FILES_BEGIN"
-            find "$APP" "$HOME" -maxdepth 3 -type f \( -name "ecosystem*.cjs" -o -name "ecosystem*.js" -o -name "*.service" \) -readable -print 2>/dev/null | sort -u | head -50
-            echo "PM2_FILES_END"
-          '
+          done
+          echo 'LOCAL_STATUS_END'
