@@ -1,0 +1,57 @@
+name: Central Prints Catalog Load Now
+
+on:
+  push:
+    branches: [ops/catalog-load-now]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  locate-source:
+    runs-on: [self-hosted, central-prints, vps, production]
+    timeout-minutes: 10
+    steps:
+      - name: Localizar fonte ou payload já existente na VPS
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TARGET_SHA="c2a7f6b55d41467851195867e3a6cdfe351f38e947afef2ca7e60045ad62c2c5"
+          BR_SHA="59a15139e462cb05bf4332caaa8e51e11f3605a64bd2dee006c2067f602f8e2e"
+          echo "RUNNER=$(whoami) HOST=$(hostname)"
+          echo "SUDO_SITE_USER=$(sudo -n -u belastock-grafica true 2>/dev/null && echo OK || echo NO)"
+          OUT="$RUNNER_TEMP/catalog-candidates.txt"
+          : > "$OUT"
+          for root in /home/belastock-grafica /opt/actions-runner-central-prints /tmp; do
+            [ -e "$root" ] || continue
+            find "$root" -xdev -type f \( -iname 'TabelaPreco*.xls' -o -iname '*catalog*.xls' -o -size 15835682c -o -size 245615c \) -print 2>/dev/null >> "$OUT" || true
+          done
+          sort -u "$OUT" -o "$OUT"
+          FOUND_SOURCE=""
+          FOUND_BR=""
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            bytes="$(wc -c < "$f" | tr -d ' ')"
+            sha="$(sha256sum "$f" | awk '{print $1}')"
+            echo "CANDIDATE bytes=$bytes sha=$sha path=$f"
+            [ "$sha" = "$TARGET_SHA" ] && FOUND_SOURCE="$f"
+            [ "$sha" = "$BR_SHA" ] && FOUND_BR="$f"
+          done < "$OUT"
+          if [ -n "$FOUND_SOURCE" ]; then
+            echo "CATALOG_SOURCE_FOUND=$FOUND_SOURCE"
+          else
+            echo "CATALOG_SOURCE_FOUND=NO"
+          fi
+          if [ -n "$FOUND_BR" ]; then
+            echo "CATALOG_BROTLI_FOUND=$FOUND_BR"
+          else
+            echo "CATALOG_BROTLI_FOUND=NO"
+          fi
+          APP=/home/belastock-grafica/htdocs/grafica.belastock.com.br
+          if [ -d "$APP" ]; then
+            echo "APP_PRESENT=YES"
+            find "$APP/ops/catalog-import/2026-09-12" -maxdepth 1 -type f -printf '%f %s\n' 2>/dev/null | sort || true
+          else
+            echo "APP_PRESENT=NO"
+          fi
