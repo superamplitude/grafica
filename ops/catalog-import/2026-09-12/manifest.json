@@ -1,0 +1,18 @@
+{
+  "source_name": "TabelaPreco-2026-09-12.xls",
+  "source_filename": "TabelaPreco(1).xls",
+  "source_sha256": "c2a7f6b55d41467851195867e3a6cdfe351f38e947afef2ca7e60045ad62c2c5",
+  "source_bytes": 15835682,
+  "compressed_format": "brotli",
+  "compressed_sha256": "59a15139e462cb05bf4332caaa8e51e11f3605a64bd2dee006c2067f602f8e2e",
+  "compressed_bytes": 245615,
+  "base64_bytes": 327488,
+  "parts": 9,
+  "expected_rows": 21329,
+  "expected_unique_codes": 21329,
+  "expected_products": 1075,
+  "expected_categories": 140,
+  "supplier_identity": "not_proven_by_file_content",
+  "internal_source_slug": "source-table-2026-09-12",
+  "policy": "stage_apply_verify_with_checksum_and_rollback"
+}
