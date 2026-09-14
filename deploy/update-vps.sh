@@ -61,37 +61,66 @@ npm run migrate
 npm run schema:verify
 log "Registrando referencias externas em quarentena"
 npm run reference:import | tee "$BACKUP_DIR/reference-import.json"
+if [ -f "ops/catalog-import/2026-09-12/manifest.json" ]; then
+  log "Importando catalogo integral empacotado com backup e checksum"
+  bash deploy/import-bundled-catalog.sh | tee "$BACKUP_DIR/catalog-import.log"
+fi
 log "Reiniciando Central Prints na porta local $APP_PORT"
 pm2 startOrReload ecosystem.config.cjs --update-env
 
-HEALTH="000"; READY="000"; ROOT="000"; CATALOG="000"
+HEALTH="000"; READY="000"; ROOT="000"; CATALOG="000"; SUMMARY="000"; COMPLETE="000"
 for _ in $(seq 1 25); do
   HEALTH="$(curl -sS --max-time 5 -o "$BACKUP_DIR/health.json" -w '%{http_code}' "http://127.0.0.1:$APP_PORT/api/health" || true)"
   READY="$(curl -sS --max-time 5 -o "$BACKUP_DIR/ready.json" -w '%{http_code}' "http://127.0.0.1:$APP_PORT/api/ready" || true)"
   ROOT="$(curl -sS --max-time 5 -o "$BACKUP_DIR/home.html" -w '%{http_code}' "http://127.0.0.1:$APP_PORT/" || true)"
   CATALOG="$(curl -sS --max-time 5 -o "$BACKUP_DIR/catalogo.html" -w '%{http_code}' "http://127.0.0.1:$APP_PORT/catalogo.html" || true)"
-  [ "$HEALTH" = "200" ] && [ "$READY" = "200" ] && [ "$ROOT" = "200" ] && [ "$CATALOG" = "200" ] && break
+  SUMMARY="$(curl -sS --max-time 10 -o "$BACKUP_DIR/catalog-summary.json" -w '%{http_code}' "http://127.0.0.1:$APP_PORT/api/v1/catalog/summary" || true)"
+  COMPLETE="$(curl -sS --max-time 30 -o "$BACKUP_DIR/catalog-complete.json" -w '%{http_code}' "http://127.0.0.1:$APP_PORT/api/v1/catalog/complete" || true)"
+  [ "$HEALTH" = "200" ] && [ "$READY" = "200" ] && [ "$ROOT" = "200" ] && [ "$CATALOG" = "200" ] && [ "$SUMMARY" = "200" ] && [ "$COMPLETE" = "200" ] && break
   sleep 1
 done
 
-echo "LOCAL_PORT=$APP_PORT"; echo "LOCAL_HEALTH_HTTP=$HEALTH"; echo "LOCAL_READY_HTTP=$READY"; echo "LOCAL_HOME_HTTP=$ROOT"; echo "LOCAL_CATALOG_HTTP=$CATALOG"
+echo "LOCAL_PORT=$APP_PORT"; echo "LOCAL_HEALTH_HTTP=$HEALTH"; echo "LOCAL_READY_HTTP=$READY"; echo "LOCAL_HOME_HTTP=$ROOT"; echo "LOCAL_CATALOG_HTTP=$CATALOG"; echo "LOCAL_SUMMARY_HTTP=$SUMMARY"; echo "LOCAL_COMPLETE_HTTP=$COMPLETE"
 [ "$HEALTH" = "200" ] || fail "Health local falhou na porta $APP_PORT: $HEALTH"
 [ "$READY" = "200" ] || fail "Readiness local falhou na porta $APP_PORT: $READY"
 [ "$ROOT" = "200" ] || fail "Home local falhou na porta $APP_PORT: $ROOT"
 [ "$CATALOG" = "200" ] || fail "Catalogo local falhou na porta $APP_PORT: $CATALOG"
+[ "$SUMMARY" = "200" ] || fail "Resumo do catalogo falhou: $SUMMARY"
+[ "$COMPLETE" = "200" ] || fail "Catalogo completo falhou: $COMPLETE"
 grep -qi 'Central Prints' "$BACKUP_DIR/home.html" || fail "Home respondeu 200 sem identidade Central Prints."
 grep -qi 'Catálogo Central Prints' "$BACKUP_DIR/catalogo.html" || fail "Catalogo respondeu 200 sem o conteudo esperado."
+node --input-type=module - "$BACKUP_DIR/catalog-summary.json" "$BACKUP_DIR/catalog-complete.json" <<'NODE'
+import fs from 'node:fs';
+const [, , summaryFile, completeFile]=process.argv;
+const summary=JSON.parse(fs.readFileSync(summaryFile,'utf8'));
+const complete=JSON.parse(fs.readFileSync(completeFile,'utf8'));
+if(summary.products!==1075)throw new Error(`SUMMARY_PRODUCTS:${summary.products}`);
+if(summary.categories!==140)throw new Error(`SUMMARY_CATEGORIES:${summary.categories}`);
+if(summary.variants!==21329)throw new Error(`SUMMARY_VARIANTS:${summary.variants}`);
+if(!Array.isArray(complete.items)||complete.items.length!==1075)throw new Error(`COMPLETE_ITEMS:${complete.items?.length}`);
+for(const item of complete.items){
+  if(!item.short_description||!item.description||!item.image_url||!item.gabaritos_url||!item.product_url)throw new Error(`INCOMPLETE_PRODUCT:${item.slug}`);
+}
+console.log(JSON.stringify({catalog_summary:summary,complete_items:complete.items.length,all_product_links_present:true}));
+NODE
 
 log "Validando HTTPS de origem e publico"
 ORIGIN="$(curl -ksS --resolve "$DOMAIN:443:127.0.0.1" --max-time 15 -o "$BACKUP_DIR/origin.html" -w '%{http_code}' "https://$DOMAIN/?deploy=$STAMP" || true)"
 PUBLIC="$(curl -kLsS --max-redirs 5 --max-time 20 -o "$BACKUP_DIR/public.html" -w '%{http_code}' "https://$DOMAIN/?deploy=$STAMP" || true)"
 PUBLIC_CATALOG="$(curl -kLsS --max-redirs 5 --max-time 20 -o "$BACKUP_DIR/public-catalog.html" -w '%{http_code}' "https://$DOMAIN/catalogo.html?deploy=$STAMP" || true)"
-echo "ORIGIN_HTTP=$ORIGIN"; echo "PUBLIC_HTTP=$PUBLIC"; echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"
+PUBLIC_SUMMARY="$(curl -kLsS --max-redirs 5 --max-time 20 -o "$BACKUP_DIR/public-summary.json" -w '%{http_code}' "https://$DOMAIN/api/v1/catalog/summary?deploy=$STAMP" || true)"
+echo "ORIGIN_HTTP=$ORIGIN"; echo "PUBLIC_HTTP=$PUBLIC"; echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"; echo "PUBLIC_SUMMARY_HTTP=$PUBLIC_SUMMARY"
 [ "$ORIGIN" = "200" ] || fail "Origem HTTPS falhou: $ORIGIN"
 [ "$PUBLIC" = "200" ] || fail "Home publica falhou: $PUBLIC"
 [ "$PUBLIC_CATALOG" = "200" ] || fail "Catalogo publico falhou: $PUBLIC_CATALOG"
+[ "$PUBLIC_SUMMARY" = "200" ] || fail "Resumo publico do catalogo falhou: $PUBLIC_SUMMARY"
 grep -qi 'Central Prints' "$BACKUP_DIR/public.html" || fail "Home publica sem identidade esperada."
 grep -qi 'Catálogo Central Prints' "$BACKUP_DIR/public-catalog.html" || fail "Catalogo publico sem conteudo esperado."
+node --input-type=module - "$BACKUP_DIR/public-summary.json" <<'NODE'
+import fs from 'node:fs';
+const summary=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+if(summary.products!==1075||summary.categories!==140||summary.variants!==21329)throw new Error(`PUBLIC_CATALOG_COUNTS:${JSON.stringify(summary)}`);
+NODE
 
 log "Persistindo estado PM2 validado"
 pm2 save
@@ -102,6 +131,7 @@ const fs=require('node:fs');const path=require('node:path');const [, , commit, p
 NODE
 chmod 644 runtime/deploy-status.json
 cp -a runtime/deploy-status.json "$BACKUP_DIR/deploy-status.json"
+[ -f runtime/catalog-status.json ] && cp -a runtime/catalog-status.json "$BACKUP_DIR/catalog-status.json" || true
 trap - ERR
 
 log "Deploy do site concluido"
@@ -112,6 +142,7 @@ echo "COMMIT=$(git_safe rev-parse --short HEAD)"
 echo "LOCAL_PORT=$APP_PORT"
 echo "HOME=https://$DOMAIN/"
 echo "CATALOGO=https://$DOMAIN/catalogo.html"
+echo "CATALOGO_COMPLETO=https://$DOMAIN/api/v1/catalog/complete"
 echo "ADMIN=https://$DOMAIN/admin/"
 echo "EDITOR=https://$DOMAIN/admin/catalogo.html"
 echo "IMAGENS=https://$DOMAIN/admin/imagens.html"
@@ -120,6 +151,6 @@ echo "INTEGRACOES=https://$DOMAIN/admin/integracoes.html"
 echo "PEDIDOS=https://$DOMAIN/admin/pedidos.html"
 echo "PREPRESS=https://$DOMAIN/admin/prepress.html"
 echo "RELEASE=https://$DOMAIN/api/release"
-echo "HEALTH_HTTP=$HEALTH"; echo "READY_HTTP=$READY"; echo "PUBLIC_HTTP=$PUBLIC"; echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"
+echo "HEALTH_HTTP=$HEALTH"; echo "READY_HTTP=$READY"; echo "PUBLIC_HTTP=$PUBLIC"; echo "PUBLIC_CATALOG_HTTP=$PUBLIC_CATALOG"; echo "PUBLIC_SUMMARY_HTTP=$PUBLIC_SUMMARY"
 echo "BACKUP_DIR=$BACKUP_DIR"
 echo "============================================================"
