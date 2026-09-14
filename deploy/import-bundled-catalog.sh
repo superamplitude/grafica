@@ -5,6 +5,8 @@ APP_DIR="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
 PAYLOAD_DIR="$APP_DIR/ops/catalog-import/2026-09-12"
 MANIFEST="$PAYLOAD_DIR/manifest.json"
 STATE_DIR="/var/lib/central-prints-autodeploy"
+BACKUP_ROOT="/home/belastock-grafica/backups"
+STAMP="$(date +%Y%m%d_%H%M%S)"
 TMP_DIR="$(mktemp -d /tmp/central-prints-catalog.XXXXXX)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -13,7 +15,7 @@ fail(){ printf '[catalog-import][ERRO] %s\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || fail "Execute como root."
 [ -f "$MANIFEST" ] || { log "Sem payload de catalogo; nada a fazer."; exit 0; }
-for cmd in node npm sha256sum base64; do command -v "$cmd" >/dev/null 2>&1 || fail "Comando ausente: $cmd"; done
+for cmd in node npm sha256sum base64 gzip; do command -v "$cmd" >/dev/null 2>&1 || fail "Comando ausente: $cmd"; done
 cd "$APP_DIR"
 
 read_manifest(){ node --input-type=module - "$MANIFEST" "$1" <<'NODE'
@@ -72,15 +74,36 @@ ACTUAL_SOURCE_BYTES="$(wc -c < "$RAW" | tr -d ' ')"
 printf '%s  %s\n' "$SOURCE_SHA" "$RAW" | sha256sum -c - >/dev/null
 log "Payload reconstruido e verificado: $SOURCE_SHA"
 
+DUMP_CMD="$(command -v mariadb-dump || command -v mysqldump || true)"
+[ -n "$DUMP_CMD" ] || fail "mariadb-dump/mysqldump ausente; importacao em massa bloqueada sem backup."
+DB_NAME="$(node --input-type=module -e "import 'dotenv/config'; if(!process.env.DB_NAME)process.exit(2); process.stdout.write(process.env.DB_NAME);")"
+CLIENT_CNF="$TMP_DIR/mysql-client.cnf"
+node --input-type=module - "$CLIENT_CNF" <<'NODE'
+import 'dotenv/config';
+import fs from 'node:fs';
+const [, , target]=process.argv;
+for(const key of ['DB_USER','DB_PASSWORD'])if(!process.env[key])throw new Error(`${key}_MISSING`);
+const esc=(v)=>String(v).replace(/\\/g,'\\\\').replace(/"/g,'\\"');
+const lines=['[client]',`host="${esc(process.env.DB_HOST||'127.0.0.1')}"`,`port=${Number(process.env.DB_PORT||3306)}`,`user="${esc(process.env.DB_USER)}"`,`password="${esc(process.env.DB_PASSWORD)}"`];
+fs.writeFileSync(target,lines.join('\n')+'\n',{mode:0o600});
+NODE
+BACKUP_DIR="$BACKUP_ROOT/catalog_import_${STAMP}"
+install -d -m 700 "$BACKUP_DIR"
+log "Criando backup logico integral do banco antes da alteracao"
+"$DUMP_CMD" --defaults-extra-file="$CLIENT_CNF" --single-transaction --quick --skip-lock-tables --routines --triggers "$DB_NAME" | gzip -9 > "$BACKUP_DIR/database-before.sql.gz"
+chmod 600 "$BACKUP_DIR/database-before.sql.gz"
+printf '%s\n' "$SOURCE_SHA" > "$BACKUP_DIR/source-sha256.txt"
+cp -a "$MANIFEST" "$BACKUP_DIR/manifest.json"
+
 log "Staging integral da tabela"
-npm run supplier-price:import -- --file "$RAW" --source-name "$SOURCE_NAME" --supplier-slug "$SOURCE_SLUG" --expected-sha256 "$SOURCE_SHA" | tee "$TMP_DIR/stage.json"
+npm run supplier-price:import -- --file "$RAW" --source-name "$SOURCE_NAME" --supplier-slug "$SOURCE_SLUG" --expected-sha256 "$SOURCE_SHA" | tee "$BACKUP_DIR/stage.json"
 
 log "Aplicacao transacional do catalogo"
-npm run supplier-price:apply -- --source-name "$SOURCE_NAME" --confirm | tee "$TMP_DIR/apply.json"
+npm run supplier-price:apply -- --source-name "$SOURCE_NAME" --confirm | tee "$BACKUP_DIR/apply.json"
 
 log "Verificacao integral do catalogo"
 VERIFY_JSON="$(node src/scripts/verify-full-catalog.js)"
-printf '%s\n' "$VERIFY_JSON" | tee "$TMP_DIR/verify.json"
+printf '%s\n' "$VERIFY_JSON" | tee "$BACKUP_DIR/verify.json"
 
 echo "$VERIFY_JSON" | grep -q '"ok": true' || fail "Verificacao integral nao confirmou ok=true."
 echo "$VERIFY_JSON" | grep -q '"source_rows": 21329' || fail "Contagem de origem divergente."
@@ -89,16 +112,17 @@ echo "$VERIFY_JSON" | grep -q '"variants": 21329' || fail "Contagem de variantes
 echo "$VERIFY_JSON" | grep -q '"categories": 140' || fail "Contagem de categorias divergente."
 
 mkdir -p runtime
-node --input-type=module - "$VERIFY_JSON" "$SOURCE_NAME" <<'NODE'
+node --input-type=module - "$VERIFY_JSON" "$SOURCE_NAME" "$BACKUP_DIR" <<'NODE'
 import fs from 'node:fs';
-const [, , raw, sourceName]=process.argv;
+const [, , raw, sourceName, backupDir]=process.argv;
 const verify=JSON.parse(raw);
-const payload={...verify,source_name:sourceName,verified_at:new Date().toISOString()};
+const payload={...verify,source_name:sourceName,backup_dir:backupDir,verified_at:new Date().toISOString()};
 const tmp=`runtime/.catalog-status-${process.pid}.json`;
 fs.writeFileSync(tmp,JSON.stringify(payload,null,2)+'\n',{mode:0o644});
 fs.renameSync(tmp,'runtime/catalog-status.json');
 NODE
 chmod 644 runtime/catalog-status.json
-printf '%s\n' "source_sha256=$SOURCE_SHA applied_at=$(date -u +%FT%TZ) rows=$EXPECTED_ROWS products=$EXPECTED_PRODUCTS categories=$EXPECTED_CATEGORIES" > "$STATE_FILE"
+cp -a runtime/catalog-status.json "$BACKUP_DIR/catalog-status.json"
+printf '%s\n' "source_sha256=$SOURCE_SHA applied_at=$(date -u +%FT%TZ) rows=$EXPECTED_ROWS products=$EXPECTED_PRODUCTS categories=$EXPECTED_CATEGORIES backup=$BACKUP_DIR/database-before.sql.gz" > "$STATE_FILE"
 chmod 600 "$STATE_FILE"
-log "Catalogo integral aplicado e verificado."
+log "Catalogo integral aplicado e verificado. Backup: $BACKUP_DIR/database-before.sql.gz"
