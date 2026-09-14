@@ -1,0 +1,77 @@
+name: Central Prints Source Probe
+
+on:
+  push:
+    branches: [ops/full-catalog-import-probe]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [self-hosted, central-prints, vps, production]
+    timeout-minutes: 10
+    steps:
+      - name: Probe candidate public price table sources
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          APP="/home/belastock-grafica/htdocs/grafica.belastock.com.br"
+          TARGET_SHA="c2a7f6b55d41467851195867e3a6cdfe351f38e947afef2ca7e60045ad62c2c5"
+          TMP="$(mktemp -d /tmp/cp-source-probe.XXXXXX)"
+          trap 'rm -rf "$TMP"' EXIT
+          OUT="$TMP/probe.tsv"
+          : > "$OUT"
+          probe(){
+            name="$1"; url="$2"; file="$TMP/${name}.bin"
+            code="$(curl -LksS --max-time 90 -o "$file" -w '%{http_code}' "$url" || true)"
+            bytes="$(wc -c < "$file" 2>/dev/null || echo 0)"
+            sha="$(sha256sum "$file" 2>/dev/null | awk '{print $1}' || true)"
+            ctype="$(file -b "$file" 2>/dev/null | tr '\t\n' ' ' || true)"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$name" "$code" "$bytes" "$sha" "$url" "$ctype" >> "$OUT"
+            if [ "$sha" = "$TARGET_SHA" ]; then
+              cp "$file" "$TMP/MATCH.xls"
+              printf '%s\n' "$url" > "$TMP/MATCH.url"
+            fi
+          }
+          probe zap https://www.zapgrafica.com.br/tabelaprecos/tabelaprecosxls
+          probe atual_itatiba https://itatiba.atualcard.com.br/tabela-de-precos
+          probe atual_dinhas https://dinhasgraficacriativa.atualcard.com.br/tabela-de-precos
+          probe giv https://www.givonline.com.br/talao-de-pedido
+          # Inspect Atual Card download links found in the HTML page and probe up to 20 candidates.
+          PAGE="$TMP/atual-page.html"
+          curl -LksS --max-time 60 https://itatiba.atualcard.com.br/tabela-de-precos -o "$PAGE" || true
+          python3 - "$PAGE" "$OUT" "$TMP" "$TARGET_SHA" <<'PY'
+          import re,sys,html,urllib.parse,subprocess,pathlib,hashlib
+          page,out,tmp,target=sys.argv[1:]
+          text=pathlib.Path(page).read_text('utf-8','ignore') if pathlib.Path(page).exists() else ''
+          urls=[]
+          for raw in re.findall(r'''(?:href|url)=["']([^"']+)["']''',text,re.I):
+              u=html.unescape(raw)
+              if any(k in u.lower() for k in ('xls','tabela','preco','download')):
+                  urls.append(urllib.parse.urljoin('https://itatiba.atualcard.com.br/tabela-de-precos',u))
+          seen=[]
+          for u in urls:
+              if u not in seen: seen.append(u)
+          with open(out,'a',encoding='utf-8') as fh:
+              for i,u in enumerate(seen[:20]):
+                  f=pathlib.Path(tmp)/f'atual_link_{i}.bin'
+                  p=subprocess.run(['curl','-LksS','--max-time','90','-o',str(f),'-w','%{http_code}',u],capture_output=True,text=True)
+                  code=p.stdout.strip(); b=f.stat().st_size if f.exists() else 0
+                  sha=hashlib.sha256(f.read_bytes()).hexdigest() if f.exists() else ''
+                  fh.write(f'atual_link_{i}\t{code}\t{b}\t{sha}\t{u}\tauto\n')
+                  if sha==target:
+                      pathlib.Path(tmp,'MATCH.xls').write_bytes(f.read_bytes())
+                      pathlib.Path(tmp,'MATCH.url').write_text(u)
+          PY
+          echo '=== PROBE RESULTS ==='
+          cat "$OUT"
+          if [ -f "$TMP/MATCH.xls" ]; then
+            echo 'MATCH=YES'
+            echo -n 'MATCH_URL='; cat "$TMP/MATCH.url"
+            sudo -n -u belastock-grafica -H cp "$TMP/MATCH.xls" "$APP/TabelaPreco.source.xls"
+            sudo -n -u belastock-grafica -H chmod 600 "$APP/TabelaPreco.source.xls"
+          else
+            echo 'MATCH=NO'
+          fi
+          sudo -n -u belastock-grafica -H bash -lc 'cat > /home/belastock-grafica/htdocs/grafica.belastock.com.br/public/source-probe.txt' < "$OUT"
