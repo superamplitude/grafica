@@ -9,51 +9,32 @@ permissions:
   contents: read
 
 jobs:
-  probe-zap-table:
+  discover-zap-table:
     runs-on: [self-hosted, central-prints, vps, production]
     timeout-minutes: 10
     steps:
-      - name: Baixar e validar tabela pública atual da Zap
+      - name: Descobrir endpoint real da tabela pública Zap
         shell: bash
         run: |
           set -Eeuo pipefail
           URL='https://www.zapgrafica.com.br/tabelaprecos/tabelaprecosxls'
-          OUT="$RUNNER_TEMP/zap-current.xls"
+          OUT="$RUNNER_TEMP/zap-page.html"
           curl -fLksS --max-time 120 "$URL" -o "$OUT"
           echo "BYTES=$(wc -c < "$OUT" | tr -d ' ')"
-          echo "SHA256=$(sha256sum "$OUT" | awk '{print $1}')"
-          file "$OUT" || true
           python3 - "$OUT" <<'PY'
-          import sys,re,html,hashlib
-          p=sys.argv[1]
-          b=open(p,'rb').read()
-          try:s=b.decode('utf-8')
-          except:s=b.decode('latin1','ignore')
-          def txt(x):
-              x=re.sub(r'<br\s*/?>',' ',x,flags=re.I)
-              x=re.sub(r'<[^>]*>',' ',x)
-              return re.sub(r'\s+',' ',html.unescape(x)).strip()
-          m=re.search(r'TABELA\s+DE\s+PRE[CÇ]OS\s+(\d{2}/\d{2}/\d{4})',txt(s[:30000]),re.I)
-          rows=[]
-          for rm in re.finditer(r'<tr\b[^>]*>([\s\S]*?)</tr>',s,re.I):
-              cells=[txt(x) for x in re.findall(r'<t[dh]\b[^>]*>([\s\S]*?)</t[dh]>',rm.group(1),re.I)]
-              if len(cells)!=9: continue
-              if re.match(r'^c[oó]digo$',cells[0],re.I) or not cells[0]: continue
-              price=re.sub(r'R\$\s*','',cells[8],flags=re.I).replace('.','').replace(',','.')
-              price=re.sub(r'[^0-9.-]','',price)
-              try: float(price)
-              except: continue
-              rows.append(cells)
-          codes=[r[0] for r in rows]
-          cats={r[1] for r in rows}
-          groups={(r[1], re.sub(r'\s*-\s*\d+(?:[.,]\d+)?g$','',re.sub(r'^'+re.escape(r[1])+r'\s*-\s*','',r[2],flags=re.I),flags=re.I).strip()) for r in rows}
-          print('SOURCE_DATE='+(m.group(1) if m else 'NONE'))
-          print('ROWS='+str(len(rows)))
-          print('UNIQUE_CODES='+str(len(set(codes))))
-          print('DUPLICATES='+str(len(codes)-len(set(codes))))
-          print('CATEGORIES='+str(len(cats)))
-          print('PRODUCT_GROUPS='+str(len(groups)))
-          if rows:
-              print('FIRST_CODE='+rows[0][0])
-              print('LAST_CODE='+rows[-1][0])
+          import sys,re,html
+          s=open(sys.argv[1],'rb').read().decode('utf-8','ignore')
+          print('TITLE=',re.sub(r'\s+',' ',re.search(r'<title[^>]*>(.*?)</title>',s,re.I|re.S).group(1)).strip() if re.search(r'<title[^>]*>(.*?)</title>',s,re.I|re.S) else 'NONE')
+          vals=[]
+          for pat in [r'href=["\']([^"\']+)["\']',r'src=["\']([^"\']+)["\']',r'action=["\']([^"\']+)["\']',r'https?://[^"\'\s<>]+']:
+              vals += re.findall(pat,s,re.I)
+          seen=set()
+          for v in vals:
+              v=html.unescape(v)
+              if v in seen: continue
+              seen.add(v)
+              if re.search(r'(xls|csv|tabela|preco|download|export)',v,re.I): print('LINK='+v[:1000])
+          for m in re.finditer(r'.{0,180}(xls|csv|download|export|tabela.?pre[cç]o).{0,300}',s,re.I|re.S):
+              x=re.sub(r'\s+',' ',m.group(0))
+              print('CTX='+x[:600])
           PY
