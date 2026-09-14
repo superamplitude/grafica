@@ -21,13 +21,16 @@ jobs:
           TARGET="$TARGET_DIR/CentralPrints-TabelaPreco-2026-09-12.xls"
           EXPECTED_SHA='c2a7f6b55d41467851195867e3a6cdfe351f38e947afef2ca7e60045ad62c2c5'
           EXPECTED_BYTES='15835682'
+
           test -f "$SOURCE"
           test "$(wc -c < "$SOURCE" | tr -d ' ')" = "$EXPECTED_BYTES"
           printf '%s  %s\n' "$EXPECTED_SHA" "$SOURCE" | sha256sum -c -
+
           sudo -n -u belastock-grafica mkdir -p "$TARGET_DIR"
           sudo -n -u belastock-grafica cp "$SOURCE" "$TARGET.tmp"
           sudo -n -u belastock-grafica chmod 600 "$TARGET.tmp"
-          test "$(wc -c < "$TARGET.tmp" | tr -d ' ')" = "$EXPECTED_BYTES"
-          printf '%s  %s\n' "$EXPECTED_SHA" "$TARGET.tmp" | sha256sum -c -
+          sudo -n -u belastock-grafica bash -c "test \"\$(wc -c < '$TARGET.tmp' | tr -d ' ')\" = '$EXPECTED_BYTES'"
+          sudo -n -u belastock-grafica bash -c "printf '%s  %s\\n' '$EXPECTED_SHA' '$TARGET.tmp' | sha256sum -c -"
           sudo -n -u belastock-grafica mv -f "$TARGET.tmp" "$TARGET"
+          sudo -n -u belastock-grafica test -f "$TARGET"
           echo "CATALOG_SOURCE_READY=$TARGET"
