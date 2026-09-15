@@ -15,6 +15,7 @@ function safeText(v=''){return String(v||'').replace(/\s+/g,' ').trim();}
 function safeName(value='arquivo'){return String(value||'arquivo').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/^-+|-+$/g,'')||'arquivo';}
 async function api(url){const r=await fetch(url,{headers:{Accept:'application/json'}});if(!r.ok)throw new Error(`HTTP_${r.status}`);return r.json();}
 let product;
+let productTemplateFiles=[];
 
 function renderDescription(text){
  const clean=String(text||'').trim();
@@ -39,28 +40,33 @@ function collectTemplateFiles(p,verified=[],generated=[]){
    const format=String(item.template_type||'').toLowerCase();
    if(!TEMPLATE_ORDER.includes(format)||!item.url)continue;
    const ref=item.reference||p.sku||p.slug;
-   files.push({format,name:`${safeName(p.name)}-${safeName(ref)}.${format}`,url:item.url,native:true});
+   files.push({format,name:`${safeName(p.name)}-${safeName(ref)}.${format}`,url:item.url,native:true,reference:String(ref||'')});
  }
  for(const item of generated){
    for(const f of item.formats||[]){
      const format=String(f.format||'').toLowerCase();
      if(!TEMPLATE_ORDER.includes(format)||!f.url)continue;
-     files.push({format,name:f.file_name||`${safeName(p.name)}-${safeName(item.reference||item.code)}.${format}`,url:f.url,native:false});
+     const ref=item.reference||item.code;
+     files.push({format,name:f.file_name||`${safeName(p.name)}-${safeName(ref)}.${format}`,url:f.url,native:false,reference:String(ref||'')});
    }
  }
  const seen=new Set();
  return files.filter(file=>{const key=`${file.format}|${file.name}|${file.url}`;if(seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>TEMPLATE_ORDER.indexOf(a.format)-TEMPLATE_ORDER.indexOf(b.format)||a.name.localeCompare(b.name,'pt-BR'));
 }
 
+function formatLinks(files){
+ return files.map(file=>`<a class="btn secondary gabarito-format-link" href="${esc(file.url)}" title="${esc(file.name)}" ${file.native?'target="_blank" rel="noopener"':`download="${esc(file.name)}"`}>${esc(file.format.toUpperCase())}</a>`).join('');
+}
+
 function renderTemplates(p,verified=[],generated=[]){
- const files=collectTemplateFiles(p,verified,generated);
+ productTemplateFiles=collectTemplateFiles(p,verified,generated);
  const box=document.querySelector('#templatesBox');
- if(!files.length){box.innerHTML='<h2>Gabaritos</h2><p>Nenhum arquivo disponível para este produto.</p>';return;}
- const rows=files.map(file=>`<a class="product-gabarito-row" href="${esc(file.url)}" ${file.native?'target="_blank" rel="noopener"':'download'}><span>${esc(file.format.toUpperCase())}</span><strong>${esc(file.name)}</strong><b>Baixar</b></a>`).join('');
- box.innerHTML=`<h2>Gabaritos</h2><button type="button" class="btn primary gabarito-toggle" id="gabaritoToggle" aria-expanded="false">BAIXAR GABARITOS</button><div class="product-gabarito-list" id="productGabaritoList" hidden>${rows}</div>`;
+ if(!productTemplateFiles.length){box.innerHTML='';box.hidden=true;return;}
+ box.hidden=false;
+ box.innerHTML=`<button type="button" class="btn primary gabarito-toggle" id="gabaritoToggle" aria-expanded="false">GABARITO</button><div class="product-gabarito-list" id="productGabaritoList" hidden>${formatLinks(productTemplateFiles)}</div>`;
  const toggle=document.querySelector('#gabaritoToggle');
  const list=document.querySelector('#productGabaritoList');
- toggle?.addEventListener('click',()=>{const open=list.hidden;list.hidden=!open;toggle.setAttribute('aria-expanded',String(open));toggle.textContent=open?'FECHAR GABARITOS':'BAIXAR GABARITOS';});
+ toggle?.addEventListener('click',()=>{const open=list.hidden;list.hidden=!open;toggle.setAttribute('aria-expanded',String(open));});
 }
 
 function renderFlags(p){
@@ -80,8 +86,19 @@ function renderVariantMatrix(variants,p){
  box.hidden=false;
  const priceLink=document.querySelector('#categoryPriceLink');
  if(priceLink&&p.category_slug)priceLink.href=`/precos.html?category=${encodeURIComponent(p.category_slug)}`;
- rows.innerHTML=variants.map(v=>`<tr><td><strong>${esc(v.name)}</strong>${v.external_code||v.sku?`<small>${esc(v.external_code||v.sku)}</small>`:''}</td><td>${v.quantity?esc(v.quantity):'—'}</td><td>${esc(v.size_label||'—')}</td><td>${esc(v.print_configuration||'—')}</td><td>${v.production_days?`${esc(v.production_days)} dia(s)`:'—'}${v.availability==='on_request'?'<small class="matrix-warning">sob consulta</small>':''}</td><td><strong class="matrix-price">${Number(v.public_price||0)>0?money.format(Number(v.public_price)):'Sob consulta'}</strong></td><td><div class="matrix-actions"><button type="button" class="matrix-select" data-variant-id="${v.id}" ${Number(v.public_price||0)<=0?'disabled':''}>Selecionar</button>${v.gabarito_url?'<a href="#templatesBox">Gabaritos</a>':''}</div></td></tr>`).join('');
- rows.addEventListener('click',e=>{const button=e.target.closest('[data-variant-id]');if(!button)return;variantSelect.value=button.dataset.variantId;variantSelect.dispatchEvent(new Event('change'));document.querySelector('.config-panel')?.scrollIntoView({behavior:'smooth',block:'start'});});
+ rows.innerHTML=variants.map(v=>`<tr><td><strong>${esc(v.name)}</strong>${v.external_code||v.sku?`<small>${esc(v.external_code||v.sku)}</small>`:''}</td><td>${v.quantity?esc(v.quantity):'—'}</td><td>${esc(v.size_label||'—')}</td><td>${esc(v.print_configuration||'—')}</td><td>${v.production_days?`${esc(v.production_days)} dia(s)`:'—'}${v.availability==='on_request'?'<small class="matrix-warning">sob consulta</small>':''}</td><td><strong class="matrix-price">${Number(v.public_price||0)>0?money.format(Number(v.public_price)):'Sob consulta'}</strong></td><td><div class="matrix-actions"><button type="button" class="matrix-select" data-variant-id="${v.id}" ${Number(v.public_price||0)<=0?'disabled':''}>Selecionar</button>${v.gabarito_url?`<button type="button" class="matrix-gabarito-toggle" data-gabarito-code="${esc(v.external_code||v.sku||v.id)}" aria-expanded="false">Gabarito</button><div class="matrix-gabarito-list" hidden></div>`:''}</div></td></tr>`).join('');
+ rows.addEventListener('click',e=>{
+   const selectButton=e.target.closest('[data-variant-id]');
+   if(selectButton){variantSelect.value=selectButton.dataset.variantId;variantSelect.dispatchEvent(new Event('change'));document.querySelector('.config-panel')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
+   const gabaritoButton=e.target.closest('[data-gabarito-code]');
+   if(!gabaritoButton)return;
+   const target=gabaritoButton.nextElementSibling;
+   const code=String(gabaritoButton.dataset.gabaritoCode||'');
+   const exact=productTemplateFiles.filter(file=>!file.reference||file.reference===code);
+   const files=exact.length?exact:productTemplateFiles;
+   if(!target.dataset.loaded){target.innerHTML=formatLinks(files);target.dataset.loaded='1';}
+   const open=target.hidden;target.hidden=!open;gabaritoButton.setAttribute('aria-expanded',String(open));
+ });
 }
 
 async function load(){
@@ -113,8 +130,7 @@ variantSelect.addEventListener('change',()=>{
    v.size_label?`Tamanho: <b>${esc(v.size_label)}</b>`:'',
    v.print_configuration?`Impressão: <b>${esc(v.print_configuration)}</b>`:'',
    v.production_days?`Produção estimada: <b>${esc(v.production_days)} dia(s)</b>`:'',
-   v.availability==='on_request'?'Disponibilidade: <b>sob consulta</b>':'Disponibilidade: <b>disponível</b>',
-   v.gabarito_url?'Gabaritos: <a href="#templatesBox">usar o botão BAIXAR GABARITOS abaixo</a>':''
+   v.availability==='on_request'?'Disponibilidade: <b>sob consulta</b>':'Disponibilidade: <b>disponível</b>'
  ].filter(Boolean).join('<br>');
  addToCart.disabled=Number(v.public_price||0)<=0;
  if(addToCart.disabled)feedback.textContent='Esta opção ainda não possui preço público liberado para pedido online.';
