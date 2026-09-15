@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/assets/gabarito-compact.css?v=20260915-7">
   <link rel="stylesheet" href="/assets/storefront-v2.css?v=20260915-1">
   <link rel="stylesheet" href="/assets/benchmark-v3.css?v=20260915-1">
+  <link rel="stylesheet" href="/assets/reference-v4.css?v=20260915-1">
 </head>
 <body>
   <div class="topbar"><div class="container topbar-inner"><span>Frete para todo o Brasil • Produção acompanhada do início ao fim</span><nav><a href="/precos.html">Tabela de preços</a><a href="/pedido.html">Acompanhar pedido</a><a href="/#atendimento">Atendimento</a></nav></div></div>
@@ -26,41 +27,78 @@
   <main>
     <div class="container product-breadcrumb"><a href="/">Início</a><span>›</span><a href="/catalogo.html">Catálogo</a><span>›</span><strong id="breadcrumbName">Produto</strong></div>
 
-    <div class="container product-layout benchmark-product-layout">
+    <div class="container product-layout benchmark-product-layout reference-product-layout">
       <section class="product-media-column">
         <div class="product-gallery" id="gallery"><div class="product-placeholder"><span>CP</span><small>Carregando imagem do produto…</small></div></div>
       </section>
 
-      <section class="config-panel benchmark-config-card">
-        <span class="eyebrow" id="categoryName">Produto gráfico</span>
-        <h1 id="productName">Carregando…</h1>
-        <p id="productDescription"></p>
-        <div class="product-flags" id="productFlags"></div>
+      <section class="config-panel benchmark-config-card reference-config-card">
+        <div class="reference-product-head">
+          <span class="eyebrow" id="categoryName">Produto gráfico</span>
+          <h1 id="productName">Carregando…</h1>
+          <p id="productDescription"></p>
+          <div class="product-flags" id="productFlags"></div>
+        </div>
 
-        <form id="configForm">
-          <div class="configurator-heading"><strong>Configure seu produto</strong><span>Preço atualizado automaticamente</span></div>
-          <select id="variantSelect" aria-hidden="true" tabindex="-1"><option value=""></option></select>
-          <div class="config-step-grid">
-            <label class="config-choice">Formato<select id="sizeSelect"></select></label>
-            <label class="config-choice">Impressão<select id="printSelect"></select></label>
-            <label class="config-choice">Quantidade<select id="quantitySelect"></select></label>
-            <label class="config-choice">Prazo de produção<select id="deadlineSelect"></select></label>
-            <label class="config-choice wide" id="finalOptionField" hidden>Opção<select id="finalOptionSelect"></select></label>
-          </div>
+        <div class="reference-config-body">
+          <form id="configForm">
+            <div class="reference-config-title"><strong>Configuração</strong><span>Escolha cada opção para atualizar preço e prazo</span></div>
+            <select id="variantSelect" aria-hidden="true" tabindex="-1"><option value=""></option></select>
 
-          <div class="variant-detail" id="variantDetail">Carregando combinações disponíveis…</div>
-          <div class="templates-box templates-inline" id="templatesBox" hidden></div>
-          <div class="artwork-note" id="artworkNote"><strong>Arte do produto</strong><span>Quando exigida, a arte será vinculada ao pedido antes da liberação para produção.</span></div>
-          <label>Observações<textarea id="notes" maxlength="1000" placeholder="Informações importantes para a produção"></textarea></label>
-          <div class="config-total"><span>Total deste item</span><strong id="itemPrice">—</strong></div>
-          <button class="btn primary full" id="addToCart" type="submit" disabled>Adicionar ao carrinho</button>
-          <div class="form-feedback" id="formFeedback" aria-live="polite"></div>
-        </form>
+            <div class="reference-config-stack">
+              <div class="reference-choice-group">
+                <div class="reference-choice-head"><strong>Formato</strong><small>Escolha o tamanho disponível</small></div>
+                <select id="sizeSelect"></select>
+                <div class="option-card-grid" id="sizeSelectCards"></div>
+              </div>
+
+              <div class="reference-choice-group">
+                <div class="reference-choice-head"><strong>Impressão e acabamento</strong><small>Defina a configuração de impressão</small></div>
+                <select id="printSelect"></select>
+                <div class="option-card-grid" id="printSelectCards"></div>
+              </div>
+
+              <div class="reference-choice-group">
+                <div class="reference-choice-head"><strong>Quantidade</strong><small>Compare a tiragem e o valor unitário</small></div>
+                <select id="quantitySelect"></select>
+                <div class="option-card-grid quantity-grid" id="quantitySelectCards"></div>
+              </div>
+
+              <div class="reference-choice-group">
+                <div class="reference-choice-head"><strong>Prazo de produção</strong><small>Não inclui transporte</small></div>
+                <select id="deadlineSelect"></select>
+                <div class="option-card-grid" id="deadlineSelectCards"></div>
+              </div>
+
+              <label class="reference-final-option" id="finalOptionField" hidden>Opção disponível<select id="finalOptionSelect"></select></label>
+
+              <div class="variant-detail reference-variant-detail" id="variantDetail">Carregando combinações disponíveis…</div>
+              <div class="templates-box templates-inline reference-resources" id="templatesBox" hidden></div>
+
+              <div class="order-summary-card">
+                <div class="order-summary-head"><strong>Resumo do pedido</strong><span>Preço desta configuração</span></div>
+                <div class="order-summary-lines">
+                  <div class="order-summary-line"><span>Configuração</span><strong id="summaryConfiguration">—</strong></div>
+                  <div class="order-summary-line"><span>Quantidade</span><strong id="summaryQuantity">—</strong></div>
+                  <div class="order-summary-line"><span>Preço por unidade</span><strong id="summaryUnitPrice">—</strong></div>
+                  <div class="order-summary-line"><span>Previsão de produção</span><strong id="summaryProduction">—</strong></div>
+                </div>
+                <div class="order-summary-total"><span>Total deste item</span><strong id="itemPrice">—</strong></div>
+                <div class="order-summary-note">Entrega e frete são calculados no checkout. O prazo final considera produção + transporte.</div>
+              </div>
+
+              <div class="artwork-note reference-artwork-note" id="artworkNote"><strong>Envio da arte</strong><span>Quando exigida, a arte poderá ser vinculada ao pedido antes da liberação para produção.</span></div>
+              <label class="reference-notes">Observações<textarea id="notes" maxlength="1000" placeholder="Informações importantes para a produção"></textarea></label>
+              <button class="btn primary full" id="addToCart" type="submit" disabled>Adicionar ao carrinho</button>
+              <div class="form-feedback" id="formFeedback" aria-live="polite"></div>
+            </div>
+          </form>
+        </div>
         <div class="safe-note">O preço é validado novamente no servidor ao registrar o pedido. Custos internos e valores de fornecedores não são enviados ao navegador.</div>
       </section>
     </div>
 
-    <section class="container product-secondary">
+    <section class="container product-secondary reference-secondary">
       <div class="product-secondary-grid">
         <div class="product-info-card benchmark-info"><span class="eyebrow">Sobre este produto</span><h2>Informações</h2><div id="productLongDescription" class="rich-description">As informações detalhadas deste produto aparecerão aqui.</div></div>
 
@@ -73,11 +111,16 @@
         </details>
       </div>
 
-      <div class="print-guide benchmark-guide"><span class="eyebrow">Preparação da arte</span><h2>Antes de enviar seu arquivo</h2><div class="print-guide-grid"><article><strong>Sangria</strong><span>Estenda fundos e imagens além da linha de corte conforme o gabarito do produto.</span></article><article><strong>Área segura</strong><span>Mantenha textos, logotipos e elementos importantes afastados das bordas de corte.</span></article><article><strong>Resolução</strong><span>Prefira arquivos em alta resolução e confira a escala correta antes do envio.</span></article><article><strong>Cores</strong><span>Prepare a arte para impressão e revise conversões de cor antes da aprovação final.</span></article></div></div>
+      <details class="reference-details" open>
+        <summary>Detalhes das opções e preparação da arte</summary>
+        <div class="reference-details-body">
+          <div class="print-guide benchmark-guide reference-guide"><span class="eyebrow">Dicas para o gabarito</span><h2>Antes de enviar seu arquivo</h2><div class="print-guide-grid"><article><strong>Use o gabarito correto</strong><span>Baixe o arquivo referente à configuração escolhida. Se alterar formato ou opção, confira o gabarito novamente.</span></article><article><strong>Corte, sangria e segurança</strong><span>Respeite somente as linhas e margens indicadas no gabarito homologado. Não presuma medidas que não estejam informadas.</span></article><article><strong>Resolução e fontes</strong><span>Use imagens em alta resolução e, quando possível, converta fontes em curvas antes do envio.</span></article><article><strong>Cores para impressão</strong><span>Revise a conversão de cores e prepare o arquivo conforme a orientação específica do produto antes da aprovação.</span></article></div></div>
+        </div>
+      </details>
     </section>
   </main>
 
   <footer><div class="container footer-grid compact-footer"><div><a class="brand footer-brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a><p>Configuração, arte e produção dentro do mesmo fluxo.</p></div><div><h3>Catálogo</h3><a href="/catalogo.html">Todos os produtos</a><a href="/precos.html">Tabela de preços</a></div><div><h3>Pedidos</h3><a href="/pedido.html">Acompanhar pedido</a></div><div><h3>Central Prints</h3><a href="/#atendimento">Atendimento</a></div></div></footer>
-  <script type="module" src="/assets/product-v3.js?v=20260915-1"></script>
+  <script type="module" src="/assets/product-v4.js?v=20260915-1"></script>
 </body>
 </html>
