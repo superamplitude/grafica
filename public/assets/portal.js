@@ -1,6 +1,7 @@
 const sliderStyles=document.createElement('link');sliderStyles.rel='stylesheet';sliderStyles.href='/assets/portal-slider.css';document.head.appendChild(sliderStyles);
 const money = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const categoryGrid=document.querySelector('#categoryGrid');
+const categoryRail=document.querySelector('#categoryRail');
 const productGrid=document.querySelector('#productGrid');
 const catalogStatus=document.querySelector('#catalogStatus');
 const heroSection=document.querySelector('.hero');
@@ -18,13 +19,18 @@ function readCart(){try{return JSON.parse(localStorage.getItem('cp-cart')||'[]')
 function updateCartCount(){const el=document.querySelector('#cartCount');if(el)el.textContent=readCart().reduce((sum,item)=>sum+Number(item.lots||1),0);}
 
 function categoryCard(item){
-  return `<a class="category-card" href="/catalogo.html?category=${encodeURIComponent(item.slug)}"><strong>${escapeHtml(item.name)}</strong><span>${Number(item.product_count||0)} produto(s)</span></a>`;
+  return `<a class="category-card" href="/catalogo.html?category=${encodeURIComponent(item.slug)}"><strong>${escapeHtml(item.name)}</strong><span>${Number(item.product_count||0).toLocaleString('pt-BR')} produto(s)</span><i aria-hidden="true">→</i></a>`;
+}
+function categoryRailItem(item){
+  return `<a href="/catalogo.html?category=${encodeURIComponent(item.slug)}"><span>${escapeHtml(item.name)}</span><b>${Number(item.product_count||0).toLocaleString('pt-BR')}</b></a>`;
 }
 
 function productCard(item){
-  const image=item.cover_url?`<img src="${escapeHtml(item.cover_url)}" alt="${escapeHtml(item.name)}" loading="lazy">`:'<span class="image-placeholder" aria-hidden="true"></span>';
+  const image=item.image_url||item.cover_url;
+  const imageHtml=image?`<img src="${escapeHtml(image)}" alt="${escapeHtml(item.name)}" loading="lazy">`:'<span class="image-placeholder" aria-hidden="true"></span>';
   const price=Number(item.starting_price||0)>0?money.format(Number(item.starting_price)):'Sob consulta';
-  return `<article class="product-card"><a class="product-image" href="/produto.html?slug=${encodeURIComponent(item.slug)}">${image}</a><div class="product-body"><span class="badge">${item.requires_artwork?'Personalizável':'Produto gráfico'}</span><h3><a href="/produto.html?slug=${encodeURIComponent(item.slug)}">${escapeHtml(item.name)}</a></h3><p>${escapeHtml(item.short_description||'Configure este produto conforme sua necessidade.')}</p><div class="price"><small>${price==='Sob consulta'?'Preço':'A partir de'}</small><strong>${price}</strong></div><a class="configure" href="/produto.html?slug=${encodeURIComponent(item.slug)}">Configurar produto</a></div></article>`;
+  const variants=Number(item.variants_count||0);
+  return `<article class="product-card"><a class="product-image" href="/produto.html?slug=${encodeURIComponent(item.slug)}">${imageHtml}</a><div class="product-body"><span class="badge">${item.requires_artwork?'Personalizável':'Produto gráfico'}</span><h3><a href="/produto.html?slug=${encodeURIComponent(item.slug)}">${escapeHtml(item.name)}</a></h3><p>${escapeHtml(item.short_description||'Configure este produto conforme sua necessidade.')}</p>${variants?`<div class="product-meta"><span>${variants.toLocaleString('pt-BR')} opções</span><span>Escolha prazo e quantidade</span></div>`:''}<div class="price"><small>${price==='Sob consulta'?'Preço':'A partir de'}</small><strong>${price}</strong></div><a class="configure" href="/produto.html?slug=${encodeURIComponent(item.slug)}">Configurar produto</a></div></article>`;
 }
 
 async function getJson(url){
@@ -165,8 +171,13 @@ async function loadHomeContent(){
 async function loadCategories(){
   try{
     const data=await getJson('/api/v1/categories');
-    categoryGrid.innerHTML=data.items?.length?data.items.map(categoryCard).join(''):'<div class="empty">O catálogo está sendo organizado. Volte em breve para conferir as categorias publicadas.</div>';
-  }catch{categoryGrid.innerHTML='<div class="empty">Não foi possível carregar as categorias neste momento.</div>';}
+    const items=(data.items||[]).filter(item=>Number(item.product_count||0)>0).sort((a,b)=>Number(b.product_count||0)-Number(a.product_count||0)||String(a.name).localeCompare(String(b.name),'pt-BR'));
+    if(categoryRail)categoryRail.innerHTML=items.length?items.slice(0,16).map(categoryRailItem).join(''):'<div class="empty compact">Categorias em preparação.</div>';
+    if(categoryGrid)categoryGrid.innerHTML=items.length?items.slice(0,8).map(categoryCard).join(''):'<div class="empty">O catálogo está sendo organizado. Volte em breve para conferir as categorias publicadas.</div>';
+  }catch{
+    if(categoryRail)categoryRail.innerHTML='<div class="empty compact">Não foi possível carregar as categorias.</div>';
+    if(categoryGrid)categoryGrid.innerHTML='<div class="empty">Não foi possível carregar as categorias neste momento.</div>';
+  }
 }
 
 async function loadProducts(){
