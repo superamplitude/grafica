@@ -12,37 +12,35 @@ jobs:
     runs-on: [self-hosted, central-prints, vps, production]
     timeout-minutes: 10
     steps:
-      - name: Diagnose live endpoints
+      - name: Diagnose local and public endpoints
         shell: bash
         run: |
           set -Eeuo pipefail
           node --input-type=module <<'NODE'
-          const base='http://127.0.0.1:3005';
-          const get=async(url)=>{const r=await fetch(url);const text=await r.text();return {status:r.status,type:r.headers.get('content-type'),text,url:r.url};};
-          const health=await get(base+'/api/health');
-          console.log('HEALTH',health.status,health.text);
-          const productsResponse=await get(base+'/api/v1/products?limit=5');
-          console.log('PRODUCTS_HTTP',productsResponse.status,productsResponse.type);
-          const products=JSON.parse(productsResponse.text).items||[];
-          for(const p of products){
-            console.log('PRODUCT',JSON.stringify({slug:p.slug,name:p.name,cover_url:p.cover_url,image_url:p.image_url,image_type:p.image_type,gabaritos_url:p.gabaritos_url}));
-            const imageUrl=p.image_url||p.cover_url||p.technical_preview_url;
-            if(imageUrl){
-              const image=await get(imageUrl);
-              console.log('IMAGE',image.status,image.type,'bytes='+Buffer.byteLength(image.text));
-            }else console.log('IMAGE EMPTY');
-            if(p.gabaritos_url){
-              const listing=await get(p.gabaritos_url);
-              console.log('GAB_LIST',listing.status,listing.type,listing.text.slice(0,300));
-              if(listing.status===200){
-                const d=JSON.parse(listing.text);
-                const first=d.items?.[0];
-                console.log('GAB_TOTAL',d.total??0,'FIRST',first?.url||'');
-                if(first?.url){
-                  const file=await get(first.url);
-                  console.log('GAB_FILE',file.status,file.type,'bytes='+Buffer.byteLength(file.text),'prefix='+file.text.slice(0,100).replace(/\s+/g,' '));
+          const get=async(url,init={})=>{const r=await fetch(url,init);const text=await r.text();return {status:r.status,type:r.headers.get('content-type'),text,url:r.url};};
+          for (const base of ['http://127.0.0.1:3005','https://grafica.belastock.com.br']) {
+            console.log('=== BASE',base,'===');
+            try {
+              const health=await get(base+'/api/health');
+              console.log('HEALTH',health.status,health.text);
+              const productsResponse=await get(base+'/api/v1/products?limit=5');
+              console.log('PRODUCTS_HTTP',productsResponse.status,productsResponse.type);
+              const products=JSON.parse(productsResponse.text).items||[];
+              for(const p of products){
+                console.log('PRODUCT',JSON.stringify({slug:p.slug,name:p.name,cover_url:p.cover_url,image_url:p.image_url,image_type:p.image_type,gabaritos_url:p.gabaritos_url}));
+                const imageUrl=p.image_url||p.cover_url||p.technical_preview_url;
+                if(imageUrl){const image=await get(imageUrl);console.log('IMAGE',image.status,image.type,'url='+imageUrl,'bytes='+Buffer.byteLength(image.text));}
+                if(p.gabaritos_url){
+                  const listing=await get(p.gabaritos_url);console.log('GAB_LIST',listing.status,listing.type,'url='+p.gabaritos_url);
+                  if(listing.status===200){const d=JSON.parse(listing.text);const first=d.items?.[0];console.log('GAB_TOTAL',d.total??0,'FIRST',first?.url||'');if(first?.url){const file=await get(first.url);console.log('GAB_FILE',file.status,file.type,'url='+first.url,'bytes='+Buffer.byteLength(file.text));}}
                 }
               }
-            }
+            } catch (error) { console.log('BASE_ERROR',base,error.message); }
           }
           NODE
+          echo '=== NGINX REFERENCES ==='
+          grep -RIl 'grafica\.belastock\.com\.br' /etc/nginx 2>/dev/null | head -20 || true
+          for f in $(grep -RIl 'grafica\.belastock\.com\.br' /etc/nginx 2>/dev/null | head -5); do
+            echo "--- $f ---"
+            grep -E 'server_name|proxy_pass|proxy_set_header[[:space:]]+(Host|X-Forwarded-Host|X-Forwarded-Proto)' "$f" 2>/dev/null || true
+          done
