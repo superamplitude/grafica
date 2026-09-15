@@ -18,10 +18,8 @@ export function reviewPricingInput({supplierCost=0,additionalCost=0,quantity=1}=
 }
 
 export function commercialPrices({supplierCost=0,additionalCost=0}={}){
-  const realCost=Number(supplierCost||0)+Number(additionalCost||0);
-  return {
-    realCost,
-    publicPrice:calculatePrice(realCost,PRICING_POLICY.public),
-    resellerPrice:calculatePrice(realCost,PRICING_POLICY.reseller)
-  };
+  const variant={supplier_cost:Number(supplierCost||0),additional_cost:Number(additionalCost||0)};
+  const publicResult=calculatePrice(variant,PRICING_POLICY.public);
+  const resellerResult=calculatePrice(variant,PRICING_POLICY.reseller);
+  return {realCost:publicResult.real_cost,publicResult,resellerResult};
 }
