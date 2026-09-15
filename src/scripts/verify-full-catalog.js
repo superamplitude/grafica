@@ -13,7 +13,7 @@ try{
   const [[supplier]]=await db.execute('SELECT id,status FROM suppliers WHERE slug=? LIMIT 1',[SOURCE_SLUG]);
   if(!supplier)fail('CATALOG_SOURCE_MISSING');
   const supplierId=Number(supplier.id);
-  const [[imp]]=await db.execute(`SELECT id,status,source_checksum_sha256,parsed_rows,matched_count,conflict_count FROM supplier_price_imports WHERE source_checksum_sha256=? ORDER BY id DESC LIMIT 1`,[EXPECTED_SHA]);
+  const [[imp]]=await db.execute(`SELECT id,status,source_checksum_sha256,row_count,matched_count,conflict_count FROM supplier_price_imports WHERE source_checksum_sha256=? ORDER BY id DESC LIMIT 1`,[EXPECTED_SHA]);
   if(!imp)fail('FULL_CATALOG_IMPORT_MISSING');
   if(String(imp.status)!=='applied')fail('FULL_CATALOG_IMPORT_NOT_APPLIED',{status:imp.status});
   const importId=Number(imp.id);
