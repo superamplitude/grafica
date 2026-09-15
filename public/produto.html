@@ -10,28 +10,46 @@
   <link rel="stylesheet" href="/assets/product-reference.css?v=20260915-4">
   <link rel="stylesheet" href="/assets/gabarito-compact.css?v=20260915-7">
   <link rel="stylesheet" href="/assets/storefront-v2.css?v=20260915-1">
+  <link rel="stylesheet" href="/assets/benchmark-v3.css?v=20260915-1">
 </head>
 <body>
-  <div class="topbar"><div class="container topbar-inner"><a href="/catalogo.html">← Voltar ao catálogo</a><span>Configuração segura</span></div></div>
-  <header class="header"><div class="container product-header"><a class="brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a><nav class="product-mini-nav"><a href="/precos.html">Tabela de preços</a><a href="/pedido.html">Pedidos</a><a class="cart-link" href="/checkout.html">Carrinho <b id="cartCount">0</b></a></nav></div><div class="navrow"><div class="container nav-inner"><a class="all-products" href="/catalogo.html">☰ Todos os produtos</a><nav><a href="/catalogo.html?category=cartoes-de-visita">Cartões</a><a href="/catalogo.html?category=panfletos-e-flyers">Flyers</a><a href="/catalogo.html?category=adesivos-e-rotulos">Adesivos</a><a href="/catalogo.html?category=banners-e-lonas">Banners</a><a href="/catalogo.html?category=papelaria">Papelaria</a><a class="offer" href="/catalogo.html?featured=1">Destaques</a></nav></div></div></header>
+  <div class="topbar"><div class="container topbar-inner"><span>Frete para todo o Brasil • Produção acompanhada do início ao fim</span><nav><a href="/precos.html">Tabela de preços</a><a href="/pedido.html">Acompanhar pedido</a><a href="/#atendimento">Atendimento</a></nav></div></div>
+  <header class="header product-page-header">
+    <div class="container header-main">
+      <a class="brand" href="/" aria-label="Central Prints"><strong>CENTRAL</strong><span>PRINTS</span></a>
+      <form class="search" id="productSearch"><input id="productSearchInput" type="search" placeholder="O que você precisa imprimir?" autocomplete="off"><button>Buscar</button></form>
+      <div class="quick"><a href="/pedido.html"><span>Meus</span> Pedidos</a><a href="/checkout.html">Carrinho <b id="cartCount">0</b></a></div>
+    </div>
+    <div class="navrow"><div class="container nav-inner"><a class="all-products" href="/catalogo.html">☰ Todos os produtos</a><nav><a href="/catalogo.html?category=cartoes-de-visita">Cartões</a><a href="/catalogo.html?category=panfletos-e-flyers">Flyers</a><a href="/catalogo.html?category=adesivos-e-rotulos">Adesivos</a><a href="/catalogo.html?category=banners-e-lonas">Banners</a><a href="/catalogo.html?category=papelaria">Papelaria</a><a class="offer" href="/catalogo.html?featured=1">Destaques</a></nav></div></div>
+  </header>
+
   <main>
     <div class="container product-breadcrumb"><a href="/">Início</a><span>›</span><a href="/catalogo.html">Catálogo</a><span>›</span><strong id="breadcrumbName">Produto</strong></div>
-    <div class="container product-layout">
-      <section>
+
+    <div class="container product-layout benchmark-product-layout">
+      <section class="product-media-column">
         <div class="product-gallery" id="gallery"><div class="product-placeholder"><span>CP</span><small>Carregando imagem do produto…</small></div></div>
-        <div class="variant-matrix-box" id="variantMatrixBox" hidden><div class="box-heading"><div><span class="eyebrow">Opções</span><h2>Quantidades, formatos e preços</h2></div><a id="categoryPriceLink" href="/precos.html">Ver tabela completa →</a></div><div class="variant-matrix-wrap"><table class="variant-matrix"><thead><tr><th>Opção</th><th>Qtd.</th><th>Formato</th><th>Impressão</th><th>Prazo</th><th>Preço</th><th></th></tr></thead><tbody id="variantMatrixRows"></tbody></table></div></div>
-        <div class="product-info-card"><span class="eyebrow">Sobre este produto</span><h2>Informações</h2><div id="productLongDescription" class="rich-description">As informações detalhadas deste produto aparecerão aqui.</div></div>
-        <div class="templates-box" id="templatesBox"><h2>Gabaritos</h2><p>Carregando arquivos…</p></div>
-        <div class="print-guide"><span class="eyebrow">Preparação da arte</span><h2>Antes de enviar seu arquivo</h2><div class="print-guide-grid"><article><strong>Sangria</strong><span>Estenda fundos e imagens além da linha de corte conforme o gabarito do produto.</span></article><article><strong>Área segura</strong><span>Mantenha textos, logotipos e elementos importantes afastados das bordas de corte.</span></article><article><strong>Resolução</strong><span>Prefira arquivos em alta resolução e confira a escala correta antes do envio.</span></article><article><strong>Cores</strong><span>Prepare a arte para impressão e revise conversões de cor antes da aprovação final.</span></article></div></div>
       </section>
-      <section class="config-panel">
+
+      <section class="config-panel benchmark-config-card">
         <span class="eyebrow" id="categoryName">Produto gráfico</span>
         <h1 id="productName">Carregando…</h1>
         <p id="productDescription"></p>
         <div class="product-flags" id="productFlags"></div>
+
         <form id="configForm">
-          <label>Opção / quantidade<select id="variantSelect" required><option value="">Carregando opções…</option></select></label>
-          <div class="variant-detail" id="variantDetail">Selecione uma opção para ver medidas, impressão e prazo.</div>
+          <div class="configurator-heading"><strong>Configure seu produto</strong><span>Preço atualizado automaticamente</span></div>
+          <select id="variantSelect" aria-hidden="true" tabindex="-1"><option value=""></option></select>
+          <div class="config-step-grid">
+            <label class="config-choice">Formato<select id="sizeSelect"></select></label>
+            <label class="config-choice">Impressão<select id="printSelect"></select></label>
+            <label class="config-choice">Quantidade<select id="quantitySelect"></select></label>
+            <label class="config-choice">Prazo de produção<select id="deadlineSelect"></select></label>
+            <label class="config-choice wide" id="finalOptionField" hidden>Opção<select id="finalOptionSelect"></select></label>
+          </div>
+
+          <div class="variant-detail" id="variantDetail">Carregando combinações disponíveis…</div>
+          <div class="templates-box templates-inline" id="templatesBox" hidden></div>
           <div class="artwork-note" id="artworkNote"><strong>Arte do produto</strong><span>Quando exigida, a arte será vinculada ao pedido antes da liberação para produção.</span></div>
           <label>Observações<textarea id="notes" maxlength="1000" placeholder="Informações importantes para a produção"></textarea></label>
           <div class="config-total"><span>Total deste item</span><strong id="itemPrice">—</strong></div>
@@ -41,8 +59,25 @@
         <div class="safe-note">O preço é validado novamente no servidor ao registrar o pedido. Custos internos e valores de fornecedores não são enviados ao navegador.</div>
       </section>
     </div>
+
+    <section class="container product-secondary">
+      <div class="product-secondary-grid">
+        <div class="product-info-card benchmark-info"><span class="eyebrow">Sobre este produto</span><h2>Informações</h2><div id="productLongDescription" class="rich-description">As informações detalhadas deste produto aparecerão aqui.</div></div>
+
+        <details class="product-compare">
+          <summary>Comparar todas as opções</summary>
+          <div class="variant-matrix-box" id="variantMatrixBox" hidden>
+            <div class="box-heading"><div><span class="eyebrow">Tabela completa</span><h2>Quantidades, formatos e preços</h2></div><a id="categoryPriceLink" href="/precos.html">Tabela de preços →</a></div>
+            <div class="variant-matrix-wrap"><table class="variant-matrix"><thead><tr><th>Opção</th><th>Qtd.</th><th>Formato</th><th>Impressão</th><th>Prazo</th><th>Preço</th><th></th></tr></thead><tbody id="variantMatrixRows"></tbody></table></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="print-guide benchmark-guide"><span class="eyebrow">Preparação da arte</span><h2>Antes de enviar seu arquivo</h2><div class="print-guide-grid"><article><strong>Sangria</strong><span>Estenda fundos e imagens além da linha de corte conforme o gabarito do produto.</span></article><article><strong>Área segura</strong><span>Mantenha textos, logotipos e elementos importantes afastados das bordas de corte.</span></article><article><strong>Resolução</strong><span>Prefira arquivos em alta resolução e confira a escala correta antes do envio.</span></article><article><strong>Cores</strong><span>Prepare a arte para impressão e revise conversões de cor antes da aprovação final.</span></article></div></div>
+    </section>
   </main>
+
   <footer><div class="container footer-grid compact-footer"><div><a class="brand footer-brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a><p>Configuração, arte e produção dentro do mesmo fluxo.</p></div><div><h3>Catálogo</h3><a href="/catalogo.html">Todos os produtos</a><a href="/precos.html">Tabela de preços</a></div><div><h3>Pedidos</h3><a href="/pedido.html">Acompanhar pedido</a></div><div><h3>Central Prints</h3><a href="/#atendimento">Atendimento</a></div></div></footer>
-  <script type="module" src="/assets/product-v2.js?v=20260915-1"></script>
+  <script type="module" src="/assets/product-v3.js?v=20260915-1"></script>
 </body>
 </html>
