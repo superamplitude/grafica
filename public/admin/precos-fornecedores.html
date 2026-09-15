@@ -1,100 +1,12 @@
 <!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Preços e Tabelas de Fornecedores · Central Prints</title>
-  <link rel="stylesheet" href="/admin/admin.css">
-  <link rel="stylesheet" href="/admin/admin-extra.css">
-  <link rel="stylesheet" href="/admin/precos-fornecedores.css">
-</head>
-<body class="supplier-prices-page">
-<main class="supplier-prices-shell">
-  <header class="supplier-prices-top">
-    <div>
-      <a href="/admin/">← Super Admin</a>
-      <h1>Preços e tabelas de fornecedores</h1>
-      <p>Veja custo, margem, lucro e preço de venda antes de revisar ou publicar tabelas.</p>
-    </div>
-    <div><strong id="userName">Carregando…</strong><small id="userRole"></small></div>
-  </header>
-
-  <section class="panel commercial-panel">
-    <div class="panel-head">
-      <div>
-        <span class="section-kicker">Visão comercial</span>
-        <h2>Preços publicados</h2>
-        <p>Custo do fornecedor, custo real, margem, lucro bruto e preço final por variante. Valores muito altos ficam sinalizados para revisão.</p>
-      </div>
-      <button class="action" id="reloadCommercial">Atualizar</button>
-    </div>
-    <div class="commercial-stats" id="commercialStats"><div class="empty">Carregando indicadores…</div></div>
-    <div class="commercial-filters">
-      <input id="commercialSearch" type="search" placeholder="Produto, código, categoria ou fornecedor">
-      <select id="commercialSupplier"><option value="">Todos os fornecedores</option></select>
-      <select id="commercialOutlier">
-        <option value="">Todos os preços</option>
-        <option value="1">Somente alertas ≥ R$ 100 mil</option>
-        <option value="0">Sem alertas</option>
-      </select>
-      <select id="commercialSort">
-        <option value="sale-desc">Maior preço de venda</option>
-        <option value="cost-desc">Maior custo fornecedor</option>
-        <option value="margin-desc">Maior margem real</option>
-        <option value="profit-desc">Maior lucro bruto</option>
-        <option value="sale-asc">Menor preço de venda</option>
-        <option value="product">Produto A–Z</option>
-      </select>
-      <button class="action primary" id="applyCommercialFilters">Filtrar</button>
-    </div>
-    <div class="commercial-note">Regra atual da tabela pública importada: <strong>35% de margem real</strong> sobre o preço de venda, com arredondamento final em <strong>,90</strong>. Isso equivale a aproximadamente <strong>53,85% de markup</strong> sobre o custo quando não há custo adicional.</div>
-    <div class="table-wrap commercial-table-wrap">
-      <table class="commercial-table">
-        <thead><tr>
-          <th>Alerta</th><th>Fornecedor</th><th>Produto / código</th><th>Especificação</th>
-          <th>Custo fornecedor</th><th>Custo adicional</th><th>Custo real</th>
-          <th>Margem real</th><th>Markup</th><th>Lucro bruto</th><th>Preço de venda</th><th>Revenda</th>
-        </tr></thead>
-        <tbody id="commercialRows"><tr><td colspan="12">Carregando preços…</td></tr></tbody>
-      </table>
-    </div>
-    <div id="commercialPager" class="pager"></div>
-  </section>
-
-  <section class="panel">
-    <div class="panel-head"><div><h2>Importar tabela</h2><p>O arquivo entra em staging primeiro. A publicação no catálogo exige ação explícita do Super Admin.</p></div></div>
-    <form id="uploadForm" class="upload-form">
-      <label>Arquivo HTML/XLS<input id="priceFile" type="file" accept=".xls,.html,.htm" required></label>
-      <label>Fornecedor<select id="supplierId" required><option value="">Carregando fornecedores…</option></select></label>
-      <label>Identificação<input id="sourceName" value="Tabela de preços" maxlength="255" required></label>
-      <label>SHA-256 esperado (opcional)<input id="expectedSha" maxlength="64" placeholder="Use para travar uma versão conhecida"></label>
-      <button class="action primary" id="uploadButton" type="submit">Importar para staging</button>
-      <span id="uploadMessage"></span>
-    </form>
-  </section>
-
-  <section class="panel">
-    <div class="panel-head"><div><h2>Importações</h2><p>Selecione uma tabela e use “Publicar catálogo” para criar/atualizar produtos, variantes e preços.</p></div><button class="action" id="reloadImports">Atualizar</button></div>
-    <div id="importsGrid" class="imports-grid"></div>
-  </section>
-
-  <section class="panel" id="detailsPanel" hidden>
-    <div class="panel-head">
-      <div><h2 id="detailsTitle">Detalhes</h2><p id="detailsMeta"></p></div>
-      <div class="filters">
-        <button class="action primary" id="applyCatalog">Publicar catálogo</button>
-        <input id="rowSearch" placeholder="Código, descrição ou medida">
-        <select id="matchFilter"><option value="">Todos os matches</option><option value="exact">Exatos</option><option value="unmatched">Sem match</option><option value="conflict">Conflitos</option></select>
-        <select id="reviewFilter"><option value="">Toda revisão</option><option value="pending">Pendente</option><option value="approved">Aprovada</option><option value="rejected">Rejeitada</option></select>
-        <button class="action" id="reloadRows">Filtrar</button>
-      </div>
-    </div>
-    <div id="applyMessage"></div>
-    <div id="importStats" class="stats"></div>
-    <div class="table-wrap"><table><thead><tr><th>Código</th><th>Categoria</th><th>Descrição</th><th>Qtd.</th><th>Tamanho</th><th>Prazo</th><th>Custo fornecedor</th><th>Match</th><th>Revisão</th></tr></thead><tbody id="priceRows"></tbody></table></div>
-    <div id="rowPager" class="pager"></div>
-  </section>
-</main>
-<script type="module" src="/admin/precos-fornecedores.js"></script>
-</body>
-</html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Preços e Tabelas de Fornecedores · Central Prints</title><link rel="stylesheet" href="/admin/admin.css"><link rel="stylesheet" href="/admin/admin-extra.css"><link rel="stylesheet" href="/admin/precos-fornecedores.css"></head>
+<body class="supplier-prices-page"><main class="supplier-prices-shell">
+<header class="supplier-prices-top"><div><a href="/admin/">← Super Admin</a><h1>Preços e tabelas de fornecedores</h1><p>Audite custo, markup, margem, lucro e preço final antes de disponibilizar um item.</p></div><div><strong id="userName">Carregando…</strong><small id="userRole"></small></div></header>
+<section class="panel commercial-panel"><div class="panel-head"><div><span class="section-kicker">Visão comercial</span><h2>Custos e preços do catálogo</h2><p>Custos extremos ou inválidos são retirados automaticamente da loja e ficam em revisão até decisão administrativa.</p></div><button class="action" id="reloadCommercial">Atualizar</button></div><div class="commercial-stats" id="commercialStats"><div class="empty">Carregando indicadores…</div></div>
+<div class="commercial-filters"><input id="commercialSearch" type="search" placeholder="Produto, código, categoria ou fornecedor"><select id="commercialSupplier"><option value="">Todos os fornecedores</option></select><select id="commercialOutlier"><option value="">Todos os preços</option><option value="1">Somente em revisão / alertas</option><option value="0">Somente publicados</option></select><select id="commercialSort"><option value="sale-desc">Maior preço de venda</option><option value="cost-desc">Maior custo fornecedor</option><option value="margin-desc">Maior margem real</option><option value="profit-desc">Maior lucro bruto</option><option value="sale-asc">Menor preço de venda</option><option value="product">Produto A–Z</option></select><button class="action primary" id="applyCommercialFilters">Filtrar</button></div>
+<div class="commercial-note">Regra pública: <strong>35% de markup sobre o custo real</strong>. Revenda: <strong>18% de markup</strong>. Arredondamento final em <strong>,90</strong>. Custos de <strong>R$ 100 mil ou mais</strong> permanecem fora da loja até revisão manual; nenhum custo de fonte é “corrigido” por chute.</div>
+<div class="table-wrap commercial-table-wrap"><table class="commercial-table"><thead><tr><th>Status</th><th>Fornecedor</th><th>Produto / código</th><th>Especificação</th><th>Custo fornecedor</th><th>Custo adicional</th><th>Custo real</th><th>Margem real</th><th>Markup</th><th>Lucro bruto</th><th>Preço de venda</th><th>Revenda</th><th>Ação</th></tr></thead><tbody id="commercialRows"><tr><td colspan="13">Carregando preços…</td></tr></tbody></table></div><div id="commercialPager" class="pager"></div></section>
+<section class="panel"><div class="panel-head"><div><h2>Importar tabela</h2><p>O arquivo entra em staging. A publicação exige ação explícita do Super Admin e itens suspeitos continuam pendentes.</p></div></div><form id="uploadForm" class="upload-form"><label>Arquivo HTML/XLS<input id="priceFile" type="file" accept=".xls,.html,.htm" required></label><label>Fornecedor<select id="supplierId" required><option value="">Carregando fornecedores…</option></select></label><label>Identificação<input id="sourceName" value="Tabela de preços" maxlength="255" required></label><label>SHA-256 esperado (opcional)<input id="expectedSha" maxlength="64" placeholder="Use para travar uma versão conhecida"></label><button class="action primary" id="uploadButton" type="submit">Importar para staging</button><span id="uploadMessage"></span></form></section>
+<section class="panel"><div class="panel-head"><div><h2>Importações</h2><p>Selecione uma tabela e publique de forma controlada.</p></div><button class="action" id="reloadImports">Atualizar</button></div><div id="importsGrid" class="imports-grid"></div></section>
+<section class="panel" id="detailsPanel" hidden><div class="panel-head"><div><h2 id="detailsTitle">Detalhes</h2><p id="detailsMeta"></p></div><div class="filters"><button class="action primary" id="applyCatalog">Publicar catálogo</button><input id="rowSearch" placeholder="Código, descrição ou medida"><select id="matchFilter"><option value="">Todos os matches</option><option value="exact">Exatos</option><option value="unmatched">Sem match</option><option value="conflict">Conflitos</option></select><select id="reviewFilter"><option value="">Toda revisão</option><option value="pending">Pendente</option><option value="approved">Aprovada</option><option value="rejected">Rejeitada</option></select><button class="action" id="reloadRows">Filtrar</button></div></div><div id="applyMessage"></div><div id="importStats" class="stats"></div><div class="table-wrap"><table><thead><tr><th>Código</th><th>Categoria</th><th>Descrição</th><th>Qtd.</th><th>Tamanho</th><th>Prazo</th><th>Custo fornecedor</th><th>Match</th><th>Revisão</th></tr></thead><tbody id="priceRows"></tbody></table></div><div id="rowPager" class="pager"></div></section>
+</main><script type="module" src="/admin/precos-fornecedores.js?v=20260915-2"></script></body></html>
