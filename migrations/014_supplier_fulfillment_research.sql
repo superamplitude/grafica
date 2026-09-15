@@ -28,7 +28,7 @@ INSERT INTO suppliers
 (name,slug,website_url,login_url,catalog_url,price_table_url,integration_url,catalog_source_type,fulfillment_direct,direct_shipping_mode,neutral_packaging,white_label_status,integration_type,is_primary,sync_mode,status,notes)
 VALUES
 ('Gráfica Express','grafica-express','https://www.graficaexpress.com.br/','https://www.graficaexpress.com.br/cliente/','https://www.graficaexpress.com.br/produtos','https://www.graficaexpress.com.br/tabela-de-precos',NULL,'assisted',0,'unknown',0,'unknown','assisted',0,'manual','inactive','Site oficial de revenda com Correios, transportadora e retirada. Entrega direta ao cliente final com embalagem sem marca precisa de confirmacao comercial. Sem API publica homologada.'),
-('Paulista Cartões','paulista-cartoes','https://www.paulistacartoes.com.br/','https://www.paulistacartoes.com.br/','https://www.paulistacartoes.com.br/',NULL,NULL,'assisted',1,'confirmed',0,'unknown','assisted',0,'manual','Operacao voltada a revendedores. Documentacao oficial informa entrega diretamente no endereco selecionado via Total Express e modalidades porta a porta. Embalagem neutra/white label e API precisam de confirmacao comercial.')
+('Paulista Cartões','paulista-cartoes','https://www.paulistacartoes.com.br/','https://www.paulistacartoes.com.br/','https://www.paulistacartoes.com.br/',NULL,NULL,'assisted',1,'confirmed',0,'unknown','assisted',0,'manual','inactive','Operacao voltada a revendedores. Documentacao oficial informa entrega diretamente no endereco selecionado via Total Express e modalidades porta a porta. Embalagem neutra/white label e API precisam de confirmacao comercial.')
 ON DUPLICATE KEY UPDATE
   website_url=VALUES(website_url),
   login_url=VALUES(login_url),
