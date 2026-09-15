@@ -21,11 +21,28 @@ function esc(value=''){return String(value).replace(/[&<>'"]/g,ch=>({'&':'&amp;'
 function cartCount(){try{return JSON.parse(localStorage.getItem('cp-cart')||'[]').reduce((sum,item)=>sum+Number(item.lots||1),0)}catch{return 0}}
 function updateCartCount(){document.querySelector('#cartCount').textContent=cartCount();}
 async function getJson(url){const r=await fetch(url,{headers:{Accept:'application/json'}});if(!r.ok)throw new Error(`HTTP_${r.status}`);return r.json();}
+async function hydrateSvgVisuals(root=document){
+ const nodes=[...root.querySelectorAll('[data-svg-src]:not([data-svg-loaded])')];
+ await Promise.allSettled(nodes.map(async node=>{
+  node.dataset.svgLoaded='loading';
+  try{
+   const r=await fetch(node.dataset.svgSrc,{headers:{Accept:'image/svg+xml'}});if(!r.ok)throw new Error(`HTTP_${r.status}`);
+   const svg=await r.text();if(!/^\s*(?:<\?xml[^>]*>\s*)?<svg\b/i.test(svg))throw new Error('INVALID_SVG');
+   node.innerHTML=svg;node.dataset.svgLoaded='1';node.classList.add('loaded');
+  }catch{node.dataset.svgLoaded='error';node.innerHTML='<span class="image-placeholder" aria-hidden="true"></span>';}
+ }));
+}
+function visualMarkup(item){
+ const visual=item.image_url||item.cover_url||item.technical_preview_url;
+ if(!visual)return '<span class="image-placeholder" aria-hidden="true"></span>';
+ if(item.image_type==='technical_preview'||visual.includes('/preview.svg'))return `<span class="product-visual-inline" data-svg-src="${esc(visual)}"><span class="image-placeholder" aria-hidden="true"></span></span>`;
+ return `<img src="${esc(visual)}" alt="${esc(item.name)}" loading="eager" decoding="async" data-fallback-svg="${esc(item.technical_preview_url||'')}">`;
+}
 
 function card(item){
  const visual=item.image_url||item.cover_url||item.technical_preview_url;
- const image=visual?`<img src="${esc(visual)}" alt="${esc(item.name)}" loading="lazy">`:'<span class="image-placeholder" aria-hidden="true"></span>';
- const visualBadge=item.image_type==='real_photo'?'<span class="visual-badge photo">Foto do produto</span>':'<span class="visual-badge technical">Imagem técnica</span>';
+ const image=visualMarkup(item);
+ const visualBadge=item.image_type==='real_photo'?'<span class="visual-badge photo">Foto do produto</span>':'<span class="visual-badge technical">Imagem ilustrativa</span>';
  const price=Number(item.starting_price||0)>0?money.format(Number(item.starting_price)):'Sob consulta';
  const variants=Number(item.variants_count||0);
  const gabaritos=item.gabaritos_url||`/gabaritos.html?slug=${encodeURIComponent(item.slug)}`;
@@ -76,6 +93,7 @@ async function loadProducts(){
  try{
   const d=await getJson(`/api/v1/products?${p}`);state.total=Number(d.total||0);
   grid.innerHTML=d.items?.length?d.items.map(card).join(''):'<div class="empty">Nenhum produto publicado para este filtro. Tente outra categoria ou termo de busca.</div>';
+  await hydrateSvgVisuals(grid);
   countEl.textContent=`${state.total} produto(s)`;
   const page=Math.floor(state.offset/pageSize)+1;const pages=Math.max(1,Math.ceil(state.total/pageSize));pageLabel.textContent=`Página ${page} de ${pages}`;prevBtn.disabled=state.offset===0;nextBtn.disabled=!d.has_more;
   renderFilterChips();
