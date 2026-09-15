@@ -24,6 +24,7 @@ import { registerAdminSiteRoutes } from './routes/admin-site.js';
 import { registerAdminAssetRoutes } from './routes/admin-assets.js';
 import { registerAdminProductMediaRoutes } from './routes/admin-product-media.js';
 import { registerAdminSupplierPriceRoutes } from './routes/admin-supplier-prices.js';
+import { registerAdminFinanceRoutes } from './routes/admin-finance.js';
 import { registerMediaRoutes } from './routes/media.js';
 import { registerOrderRoutes } from './routes/orders.js';
 import { registerArtworkRoutes } from './routes/artworks.js';
@@ -39,40 +40,15 @@ export async function buildApp() {
   await app.register(fastifyStatic, { root:path.join(__dirname,'..','public'),prefix:'/',wildcard:false });
   await registerAuth(app);
 
-  app.get('/api/health',async()=>({
-    ok:true,
-    service:'central-prints-node',
-    version:VERSION,
-    database:await dbStatus(),
-    storage:await r2Status(),
-    auth:app.authConfigured?'configured':'unconfigured',
-    timestamp:new Date().toISOString()
-  }));
-
+  app.get('/api/health',async()=>({ok:true,service:'central-prints-node',version:VERSION,database:await dbStatus(),storage:await r2Status(),auth:app.authConfigured?'configured':'unconfigured',timestamp:new Date().toISOString()}));
   app.get('/api/ready',async(_request,reply)=>{
-    const database=await dbStatus();
-    const storage=await r2Status();
+    const database=await dbStatus();const storage=await r2Status();
     const dbRequired=String(process.env.DB_REQUIRED??'true').toLowerCase()!=='false';
     const r2Required=String(process.env.R2_REQUIRED??'false').toLowerCase()==='true';
     const ready=(!dbRequired||database==='ok')&&(!r2Required||storage==='ok')&&app.authConfigured;
-    return reply.code(ready?200:503).send({
-      ok:ready,
-      service:'central-prints-node',
-      version:VERSION,
-      database,
-      storage,
-      auth:app.authConfigured?'configured':'unconfigured',
-      dbRequired,
-      r2Required,
-      timestamp:new Date().toISOString()
-    });
+    return reply.code(ready?200:503).send({ok:ready,service:'central-prints-node',version:VERSION,database,storage,auth:app.authConfigured?'configured':'unconfigured',dbRequired,r2Required,timestamp:new Date().toISOString()});
   });
-
-  app.get('/api/release', async () => ({
-    service:'central-prints-node',
-    version:VERSION,
-    release:await readReleaseStatus()
-  }));
+  app.get('/api/release',async()=>({service:'central-prints-node',version:VERSION,release:await readReleaseStatus()}));
   app.get('/api',async()=>({name:'Central Prints API',version:VERSION}));
 
   await registerPublicRoutes(app);
@@ -94,6 +70,7 @@ export async function buildApp() {
   await registerAdminAssetRoutes(app);
   await registerAdminProductMediaRoutes(app);
   await registerAdminSupplierPriceRoutes(app);
+  await registerAdminFinanceRoutes(app);
   await registerMediaRoutes(app);
 
   app.setErrorHandler((error,request,reply)=>{request.log.error(error);if(error?.message==='DATABASE_NOT_CONFIGURED')return reply.code(503).send({error:'DATABASE_NOT_READY'});if(error?.message==='R2_NOT_CONFIGURED')return reply.code(503).send({error:'R2_NOT_READY'});if(error?.code==='ECONNREFUSED'||error?.code==='ER_ACCESS_DENIED_ERROR'||error?.code==='ER_BAD_DB_ERROR')return reply.code(503).send({error:'DATABASE_NOT_READY'});const statusCode=Number(error?.statusCode||500);return reply.code(statusCode>=400&&statusCode<600?statusCode:500).send({error:statusCode>=500?'INTERNAL_ERROR':(error?.code||'REQUEST_ERROR')})});
