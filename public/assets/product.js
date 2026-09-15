@@ -27,17 +27,18 @@ function renderGallery(p){
  const gallery=document.querySelector('#gallery');
  const first=visuals.find(v=>v.role==='cover')||visuals[0];
  const isTechnical=first.role==='technical_preview'||first.visual_type==='technical_preview';
- gallery.innerHTML=`<div class="main-visual-wrap"><img id="mainVisual" src="${esc(first.url)}" alt="${esc(p.name)}"><span id="visualKind" class="visual-kind ${isTechnical?'technical':'photo'}">${isTechnical?'Imagem técnica neutra':'Foto do produto'}</span></div>`+(visuals.length>1?`<div class="gallery-list">${visuals.map(v=>`<button type="button" data-url="${esc(v.url)}" data-kind="${v.role==='technical_preview'||v.visual_type==='technical_preview'?'technical':'photo'}" aria-label="Ver outra imagem"><img src="${esc(v.url)}" alt=""></button>`).join('')}</div>`:'');
- gallery.addEventListener('click',e=>{const b=e.target.closest('[data-url]');const main=document.querySelector('#mainVisual');const kind=document.querySelector('#visualKind');if(b&&main){main.src=b.dataset.url;if(kind){const technical=b.dataset.kind==='technical';kind.textContent=technical?'Imagem técnica neutra':'Foto do produto';kind.className=`visual-kind ${technical?'technical':'photo'}`;}}});
+ gallery.innerHTML=`<div class="main-visual-wrap"><img id="mainVisual" src="${esc(first.url)}" alt="${esc(p.name)}"><span id="visualKind" class="visual-kind ${isTechnical?'technical':'photo'}">${isTechnical?'Imagem ilustrativa do produto':'Foto do produto'}</span></div>`+(visuals.length>1?`<div class="gallery-list">${visuals.map(v=>`<button type="button" data-url="${esc(v.url)}" data-kind="${v.role==='technical_preview'||v.visual_type==='technical_preview'?'technical':'photo'}" aria-label="Ver outra imagem"><img src="${esc(v.url)}" alt=""></button>`).join('')}</div>`:'');
+ gallery.addEventListener('click',e=>{const b=e.target.closest('[data-url]');const main=document.querySelector('#mainVisual');const kind=document.querySelector('#visualKind');if(b&&main){main.src=b.dataset.url;if(kind){const technical=b.dataset.kind==='technical';kind.textContent=technical?'Imagem ilustrativa do produto':'Foto do produto';kind.className=`visual-kind ${technical?'technical':'photo'}`;}}});
 }
 
 function renderTemplates(verified=[],generated=[]){
  const safeTemplates=verified.filter(t=>t.url);
  const generatedTemplates=generated.filter(t=>t.url);
  const box=document.querySelector('#templatesBox');
- if(!safeTemplates.length&&!generatedTemplates.length){box.innerHTML='<h2>Gabaritos técnicos</h2><p>Nenhum gabarito técnico pôde ser derivado com segurança para este produto.</p>';return;}
- const verifiedHtml=safeTemplates.length?`<div class="template-group"><h3>Arquivos homologados</h3><p>Arquivos revisados e neutros. Confira corte, segurança e sangria indicados no próprio arquivo.</p><div class="template-links">${safeTemplates.map(t=>`<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.label||String(t.template_type).toUpperCase())} · ${esc(t.side||'geral')}${t.width_mm&&t.height_mm?` · ${esc(t.width_mm)}×${esc(t.height_mm)} mm`:''}</a>`).join('')}</div></div>`:'';
- const generatedHtml=generatedTemplates.length?`<div class="template-group generated"><h3>Gabaritos dimensionais da tabela</h3><p>Gerados a partir das medidas cadastradas na tabela importada. A linha externa representa somente a dimensão final informada; sangria e área segura não são inventadas.</p><div class="template-links">${generatedTemplates.map(t=>`<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.size_label||'Medida da tabela')} · ${esc(t.print_configuration||'configuração')} · SVG</a>`).join('')}</div></div>`:'';
+ const centerUrl=`/gabaritos.html?slug=${encodeURIComponent(slug||'')}#arquivos`;
+ if(!safeTemplates.length&&!generatedTemplates.length){box.innerHTML=`<h2>Gabaritos técnicos</h2><p>Nenhum arquivo técnico está disponível para este produto.</p>`;return;}
+ const verifiedHtml=safeTemplates.length?`<div class="template-group"><h3>Arquivos originais homologados</h3><p>Arquivos revisados para produção. O formato original é preservado.</p><div class="template-links">${safeTemplates.map(t=>`<a href="${esc(t.url)}" target="_blank" rel="noopener">Baixar ${esc(String(t.template_type||'arquivo').toUpperCase())}${t.width_mm&&t.height_mm?` · ${esc(t.width_mm)}×${esc(t.height_mm)} mm`:''}</a>`).join('')}</div></div>`:'';
+ const generatedHtml=generatedTemplates.length?`<div class="template-group generated"><h3>Gabaritos para download</h3><p>Disponíveis em SVG, PDF, EPS e PSD. SVG/EPS podem ser abertos no CorelDRAW; CDR/AI nativos aparecem quando houver original homologado.</p><div class="template-links"><a class="template-formats-main" href="${esc(centerUrl)}">Escolher formato e baixar →</a></div></div>`:'';
  box.innerHTML=`<h2>Gabaritos técnicos</h2>${verifiedHtml}${generatedHtml}`;
 }
 
@@ -58,7 +59,8 @@ function renderVariantMatrix(variants,p){
  box.hidden=false;
  const priceLink=document.querySelector('#categoryPriceLink');
  if(priceLink&&p.category_slug)priceLink.href=`/precos.html?category=${encodeURIComponent(p.category_slug)}`;
- rows.innerHTML=variants.map(v=>`<tr><td><strong>${esc(v.name)}</strong>${v.external_code||v.sku?`<small>${esc(v.external_code||v.sku)}</small>`:''}</td><td>${v.quantity?esc(v.quantity):'—'}</td><td>${esc(v.size_label||'—')}</td><td>${esc(v.print_configuration||'—')}</td><td>${v.production_days?`${esc(v.production_days)} dia(s)`:'—'}${v.availability==='on_request'?'<small class="matrix-warning">sob consulta</small>':''}</td><td><strong class="matrix-price">${Number(v.public_price||0)>0?money.format(Number(v.public_price)):'Sob consulta'}</strong></td><td><div class="matrix-actions"><button type="button" class="matrix-select" data-variant-id="${v.id}" ${Number(v.public_price||0)<=0?'disabled':''}>Selecionar</button>${v.gabarito_url?`<a href="${esc(v.gabarito_url)}" target="_blank" rel="noopener">Gabarito</a>`:''}</div></td></tr>`).join('');
+ const templateCenter=`/gabaritos.html?slug=${encodeURIComponent(p.slug)}#arquivos`;
+ rows.innerHTML=variants.map(v=>`<tr><td><strong>${esc(v.name)}</strong>${v.external_code||v.sku?`<small>${esc(v.external_code||v.sku)}</small>`:''}</td><td>${v.quantity?esc(v.quantity):'—'}</td><td>${esc(v.size_label||'—')}</td><td>${esc(v.print_configuration||'—')}</td><td>${v.production_days?`${esc(v.production_days)} dia(s)`:'—'}${v.availability==='on_request'?'<small class="matrix-warning">sob consulta</small>':''}</td><td><strong class="matrix-price">${Number(v.public_price||0)>0?money.format(Number(v.public_price)):'Sob consulta'}</strong></td><td><div class="matrix-actions"><button type="button" class="matrix-select" data-variant-id="${v.id}" ${Number(v.public_price||0)<=0?'disabled':''}>Selecionar</button>${v.gabarito_url?`<a href="${esc(templateCenter)}">Gabaritos</a>`:''}</div></td></tr>`).join('');
  rows.addEventListener('click',e=>{const button=e.target.closest('[data-variant-id]');if(!button)return;variantSelect.value=button.dataset.variantId;variantSelect.dispatchEvent(new Event('change'));document.querySelector('.config-panel')?.scrollIntoView({behavior:'smooth',block:'start'});});
 }
 
@@ -92,7 +94,7 @@ variantSelect.addEventListener('change',()=>{
    v.print_configuration?`Impressão: <b>${esc(v.print_configuration)}</b>`:'',
    v.production_days?`Produção estimada: <b>${esc(v.production_days)} dia(s)</b>`:'',
    v.availability==='on_request'?'Disponibilidade: <b>sob consulta</b>':'Disponibilidade: <b>disponível</b>',
-   v.gabarito_url?`Gabarito: <a href="${esc(v.gabarito_url)}" target="_blank" rel="noopener">abrir SVG técnico desta opção</a>`:''
+   v.gabarito_url?`Gabaritos: <a href="/gabaritos.html?slug=${encodeURIComponent(product.product.slug)}#arquivos">baixar SVG, PDF, EPS ou PSD</a>`:''
  ].filter(Boolean).join('<br>');
  addToCart.disabled=Number(v.public_price||0)<=0;
  if(addToCart.disabled)feedback.textContent='Esta opção ainda não possui preço público liberado para pedido online.';

@@ -1,12 +1,31 @@
 import { getDb } from '../lib/db.js';
 import { renderProductPreviewSvg, renderVariantGabaritoSvg } from '../domain/generated-assets.js';
+import { renderVariantGabaritoEps, renderVariantGabaritoPdf, renderVariantGabaritoPsd } from '../domain/gabarito-formats.js';
 
-function svgReply(reply,svg,fileName,download=false){
-  reply.header('Content-Type','image/svg+xml; charset=utf-8');
-  reply.header('Cache-Control','public, max-age=3600, must-revalidate');
+function safeFileName(value='arquivo'){
+  return String(value||'arquivo').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/^-+|-+$/g,'')||'arquivo';
+}
+function assetReply(reply,body,{contentType,fileName,download=true,cache=true}={}){
+  reply.header('Content-Type',contentType||'application/octet-stream');
+  reply.header('Cache-Control',cache?'public, max-age=3600, must-revalidate':'no-store');
   reply.header('X-Content-Type-Options','nosniff');
-  if(download) reply.header('Content-Disposition',`attachment; filename="${String(fileName||'gabarito.svg').replace(/[^a-zA-Z0-9._-]+/g,'-')}"`);
-  return reply.send(svg);
+  if(download) reply.header('Content-Disposition',`attachment; filename="${safeFileName(fileName)}"`);
+  return reply.send(body);
+}
+function svgReply(reply,svg,fileName,download=false){
+  return assetReply(reply,svg,{contentType:'image/svg+xml; charset=utf-8',fileName,download});
+}
+async function variantByCode(code){
+  const db=getDb();
+  const [rows]=await db.execute(`SELECT v.external_code,v.sku,v.size_label,v.print_configuration,p.name AS product_name FROM product_variants v JOIN products p ON p.id=v.product_id AND p.status='active' WHERE (v.external_code=? OR v.sku=?) AND v.status='active' LIMIT 1`,[code,code]);
+  const row=rows[0];
+  if(!row)return null;
+  return {
+    code:String(row.external_code||row.sku||code),
+    productName:row.product_name,
+    sizeLabel:row.size_label,
+    printConfiguration:row.print_configuration
+  };
 }
 
 export async function registerGeneratedAssetRoutes(app){
@@ -19,14 +38,31 @@ export async function registerGeneratedAssetRoutes(app){
   });
 
   app.get('/api/v1/gabaritos/:code.svg',async(request,reply)=>{
-    const db=getDb();
     const code=String(request.params.code||'').trim();
-    const [rows]=await db.execute(`SELECT v.external_code,v.sku,v.size_label,v.print_configuration,p.name AS product_name FROM product_variants v JOIN products p ON p.id=v.product_id AND p.status='active' WHERE (v.external_code=? OR v.sku=?) AND v.status='active' LIMIT 1`,[code,code]);
-    const row=rows[0];
-    if(!row) return reply.code(404).send({error:'VARIANT_NOT_FOUND'});
-    const resolved=String(row.external_code||row.sku||code);
-    const svg=renderVariantGabaritoSvg({code:resolved,productName:row.product_name,sizeLabel:row.size_label,printConfiguration:row.print_configuration});
-    return svgReply(reply,svg,`gabarito-${resolved}.svg`,String(request.query?.download||'')==='1');
+    const meta=await variantByCode(code);
+    if(!meta) return reply.code(404).send({error:'VARIANT_NOT_FOUND'});
+    return svgReply(reply,renderVariantGabaritoSvg(meta),`gabarito-${meta.code}.svg`,String(request.query?.download||'')==='1');
+  });
+
+  app.get('/api/v1/gabaritos/:code.pdf',async(request,reply)=>{
+    const code=String(request.params.code||'').trim();
+    const meta=await variantByCode(code);
+    if(!meta) return reply.code(404).send({error:'VARIANT_NOT_FOUND'});
+    return assetReply(reply,renderVariantGabaritoPdf(meta),{contentType:'application/pdf',fileName:`gabarito-${meta.code}.pdf`});
+  });
+
+  app.get('/api/v1/gabaritos/:code.eps',async(request,reply)=>{
+    const code=String(request.params.code||'').trim();
+    const meta=await variantByCode(code);
+    if(!meta) return reply.code(404).send({error:'VARIANT_NOT_FOUND'});
+    return assetReply(reply,renderVariantGabaritoEps(meta),{contentType:'application/postscript; charset=us-ascii',fileName:`gabarito-${meta.code}.eps`});
+  });
+
+  app.get('/api/v1/gabaritos/:code.psd',async(request,reply)=>{
+    const code=String(request.params.code||'').trim();
+    const meta=await variantByCode(code);
+    if(!meta) return reply.code(404).send({error:'VARIANT_NOT_FOUND'});
+    return assetReply(reply,renderVariantGabaritoPsd(meta),{contentType:'image/vnd.adobe.photoshop',fileName:`gabarito-${meta.code}.psd`,cache:false});
   });
 
   app.get('/api/v1/products/:slug/generated-gabaritos',async(request,reply)=>{
@@ -42,18 +78,25 @@ export async function registerGeneratedAssetRoutes(app){
       if(seen.has(key)) continue;
       seen.add(key);
       const code=String(row.external_code||row.sku||row.id);
-      const path=`/api/v1/gabaritos/${encodeURIComponent(code)}.svg`;
+      const base=`/api/v1/gabaritos/${encodeURIComponent(code)}`;
+      const svgPath=`${base}.svg`;
       items.push({
         code,
-        template_type:'svg',
-        label:'SVG técnico gerado',
+        template_type:'multi',
+        label:'Gabarito editável',
         side:'general',
         size_label:row.size_label||null,
         print_configuration:row.print_configuration||null,
-        url:path,
-        download_url:`${path}?download=1`,
+        url:svgPath,
+        download_url:`${svgPath}?download=1`,
+        formats:[
+          {format:'svg',label:'SVG',url:`${svgPath}?download=1`,vector:true,editable:true},
+          {format:'pdf',label:'PDF',url:`${base}.pdf`,vector:true,editable:false},
+          {format:'eps',label:'EPS',url:`${base}.eps`,vector:true,editable:true},
+          {format:'psd',label:'PSD',url:`${base}.psd`,vector:false,editable:true}
+        ],
         source:'supplier_price_table',
-        note:'Dimensão final conforme tabela importada; sangria e área segura não são presumidas.'
+        note:'Dimensão final conforme tabela importada; sangria e área segura não são presumidas. CDR/AI nativos aparecem apenas quando houver arquivo original homologado.'
       });
     }
     return {product:{id:Number(products[0].id),name:products[0].name,slug:products[0].slug},items,total:items.length};
