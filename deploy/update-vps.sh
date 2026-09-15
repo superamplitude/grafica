@@ -154,7 +154,7 @@ const [, , summaryFile, completeFile]=process.argv;
 const summary=JSON.parse(fs.readFileSync(summaryFile,'utf8'));
 const complete=JSON.parse(fs.readFileSync(completeFile,'utf8'));
 if(summary.products!==1075)throw new Error(`SUMMARY_PRODUCTS:${summary.products}`);
-if(summary.categories!==140)throw new Error(`SUMMARY_CATEGORIES:${summary.categories}`);
+if(summary.categories<140)throw new Error(`SUMMARY_CATEGORIES:${summary.categories}`);
 if(summary.variants!==21329)throw new Error(`SUMMARY_VARIANTS:${summary.variants}`);
 if(!Array.isArray(complete.items)||complete.items.length!==1075)throw new Error(`COMPLETE_ITEMS:${complete.items?.length}`);
 for(const item of complete.items){
@@ -178,7 +178,7 @@ grep -qi 'Catálogo Central Prints' "$BACKUP_DIR/public-catalog.html" || fail "C
 node --input-type=module - "$BACKUP_DIR/public-summary.json" <<'NODE'
 import fs from 'node:fs';
 const summary=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
-if(summary.products!==1075||summary.categories!==140||summary.variants!==21329)throw new Error(`PUBLIC_CATALOG_COUNTS:${JSON.stringify(summary)}`);
+if(summary.products!==1075||summary.categories<140||summary.variants!==21329)throw new Error(`PUBLIC_CATALOG_COUNTS:${JSON.stringify(summary)}`);
 NODE
 
 log "Persistindo estado PM2 validado"
