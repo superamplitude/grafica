@@ -50,19 +50,31 @@ function card(item){
 }
 
 function inlineGabaritos(verified=[],generated=[]){
- const files=[];
+ const byFormat=new Map();
  for(const item of verified){
   const format=String(item.template_type||'').toLowerCase();
-  if(FORMAT_ORDER.includes(format)&&item.url)files.push({format,url:item.url,native:true});
+  if(FORMAT_ORDER.includes(format)&&item.url&&!byFormat.has(format))byFormat.set(format,{format,url:item.url,native:true});
  }
  for(const item of generated){
   for(const file of item.formats||[]){
    const format=String(file.format||'').toLowerCase();
-   if(FORMAT_ORDER.includes(format)&&file.url)files.push({format,url:file.url,native:false});
+   if(FORMAT_ORDER.includes(format)&&file.url&&!byFormat.has(format))byFormat.set(format,{format,url:file.url,native:false});
   }
  }
- const seen=new Set();
- return files.filter(file=>{const key=`${file.format}|${file.url}`;if(seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>FORMAT_ORDER.indexOf(a.format)-FORMAT_ORDER.indexOf(b.format));
+ return FORMAT_ORDER.map(format=>byFormat.get(format)).filter(Boolean);
+}
+
+function gabaritoBar(files=[]){
+ const byFormat=new Map(files.map(file=>[file.format,file]));
+ return FORMAT_ORDER.map((format,index)=>{
+  const file=byFormat.get(format);
+  const separator=index?'<span class="gabarito-format-separator">|</span>':'';
+  const label=esc(format.toUpperCase());
+  const entry=file
+   ?`<a class="gabarito-format-link" href="${esc(file.url)}" ${file.native?'target="_blank" rel="noopener"':'download'}>${label}</a>`
+   :`<span class="gabarito-format-unavailable" aria-disabled="true">${label}</span>`;
+  return `${separator}${entry}`;
+ }).join('');
 }
 
 async function toggleGabaritos(button){
@@ -75,12 +87,14 @@ async function toggleGabaritos(button){
   const slug=String(button.dataset.gabaritoSlug||'');
   const [verified,generated]=await Promise.allSettled([getJson(`/api/v1/products/${encodeURIComponent(slug)}/templates`),getJson(`/api/v1/products/${encodeURIComponent(slug)}/generated-gabaritos`)]);
   const files=inlineGabaritos(verified.status==='fulfilled'?(verified.value.items||[]):[],generated.status==='fulfilled'?(generated.value.items||[]):[]);
-  box.innerHTML=files.length?files.map(file=>`<a class="template-shortcut" href="${esc(file.url)}" ${file.native?'target="_blank" rel="noopener"':'download'}>${esc(file.format.toUpperCase())}</a>`).join(''):'<span>Sem arquivo</span>';
+  box.classList.add('gabarito-format-bar');
+  box.innerHTML=gabaritoBar(files);
   box.dataset.loaded='1';
   box.hidden=false;
   button.setAttribute('aria-expanded','true');
  }catch{
-  box.innerHTML='<span>Sem arquivo</span>';box.dataset.loaded='1';box.hidden=false;button.setAttribute('aria-expanded','true');
+  box.classList.add('gabarito-format-bar');
+  box.innerHTML=gabaritoBar([]);box.dataset.loaded='1';box.hidden=false;button.setAttribute('aria-expanded','true');
  }finally{button.disabled=false;}
 }
 
