@@ -9,8 +9,10 @@ const feedback=document.querySelector('#formFeedback');
 const cart=()=>{try{return JSON.parse(localStorage.getItem('cp-cart')||'[]')}catch{return[]}};
 const saveCart=(items)=>{localStorage.setItem('cp-cart',JSON.stringify(items));updateCount();};
 const updateCount=()=>{const el=document.querySelector('#cartCount');if(el)el.textContent=cart().reduce((sum,item)=>sum+Number(item.lots||1),0);};
+const TEMPLATE_ORDER=['cdr','ai','psd','pdf','svg'];
 function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 function safeText(v=''){return String(v||'').replace(/\s+/g,' ').trim();}
+function safeName(value='arquivo'){return String(value||'arquivo').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/^-+|-+$/g,'')||'arquivo';}
 async function api(url){const r=await fetch(url,{headers:{Accept:'application/json'}});if(!r.ok)throw new Error(`HTTP_${r.status}`);return r.json();}
 let product;
 
@@ -31,15 +33,34 @@ function renderGallery(p){
  gallery.addEventListener('click',e=>{const b=e.target.closest('[data-url]');const main=document.querySelector('#mainVisual');const kind=document.querySelector('#visualKind');if(b&&main){main.src=b.dataset.url;if(kind){const technical=b.dataset.kind==='technical';kind.textContent=technical?'Imagem ilustrativa do produto':'Foto do produto';kind.className=`visual-kind ${technical?'technical':'photo'}`;}}});
 }
 
-function renderTemplates(verified=[],generated=[]){
- const safeTemplates=verified.filter(t=>t.url);
- const generatedTemplates=generated.filter(t=>t.url);
+function collectTemplateFiles(p,verified=[],generated=[]){
+ const files=[];
+ for(const item of verified){
+   const format=String(item.template_type||'').toLowerCase();
+   if(!TEMPLATE_ORDER.includes(format)||!item.url)continue;
+   const ref=item.reference||p.sku||p.slug;
+   files.push({format,name:`${safeName(p.name)}-${safeName(ref)}.${format}`,url:item.url,native:true});
+ }
+ for(const item of generated){
+   for(const f of item.formats||[]){
+     const format=String(f.format||'').toLowerCase();
+     if(!TEMPLATE_ORDER.includes(format)||!f.url)continue;
+     files.push({format,name:f.file_name||`${safeName(p.name)}-${safeName(item.reference||item.code)}.${format}`,url:f.url,native:false});
+   }
+ }
+ const seen=new Set();
+ return files.filter(file=>{const key=`${file.format}|${file.name}|${file.url}`;if(seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>TEMPLATE_ORDER.indexOf(a.format)-TEMPLATE_ORDER.indexOf(b.format)||a.name.localeCompare(b.name,'pt-BR'));
+}
+
+function renderTemplates(p,verified=[],generated=[]){
+ const files=collectTemplateFiles(p,verified,generated);
  const box=document.querySelector('#templatesBox');
- const centerUrl=`/gabaritos.html?slug=${encodeURIComponent(slug||'')}#arquivos`;
- if(!safeTemplates.length&&!generatedTemplates.length){box.innerHTML=`<h2>Gabaritos técnicos</h2><p>Nenhum arquivo técnico está disponível para este produto.</p>`;return;}
- const verifiedHtml=safeTemplates.length?`<div class="template-group"><h3>Arquivos originais homologados</h3><p>Arquivos revisados para produção. O formato original é preservado.</p><div class="template-links">${safeTemplates.map(t=>`<a href="${esc(t.url)}" target="_blank" rel="noopener">Baixar ${esc(String(t.template_type||'arquivo').toUpperCase())}${t.width_mm&&t.height_mm?` · ${esc(t.width_mm)}×${esc(t.height_mm)} mm`:''}</a>`).join('')}</div></div>`:'';
- const generatedHtml=generatedTemplates.length?`<div class="template-group generated"><h3>Gabaritos para download</h3><p>Disponíveis em SVG, PDF, EPS e PSD. SVG/EPS podem ser abertos no CorelDRAW; CDR/AI nativos aparecem quando houver original homologado.</p><div class="template-links"><a class="template-formats-main" href="${esc(centerUrl)}">Escolher formato e baixar →</a></div></div>`:'';
- box.innerHTML=`<h2>Gabaritos técnicos</h2>${verifiedHtml}${generatedHtml}`;
+ if(!files.length){box.innerHTML='<h2>Gabaritos</h2><p>Nenhum arquivo disponível para este produto.</p>';return;}
+ const rows=files.map(file=>`<a class="product-gabarito-row" href="${esc(file.url)}" ${file.native?'target="_blank" rel="noopener"':'download'}><span>${esc(file.format.toUpperCase())}</span><strong>${esc(file.name)}</strong><b>Baixar</b></a>`).join('');
+ box.innerHTML=`<h2>Gabaritos</h2><button type="button" class="btn primary gabarito-toggle" id="gabaritoToggle" aria-expanded="false">BAIXAR GABARITOS</button><div class="product-gabarito-list" id="productGabaritoList" hidden>${rows}</div>`;
+ const toggle=document.querySelector('#gabaritoToggle');
+ const list=document.querySelector('#productGabaritoList');
+ toggle?.addEventListener('click',()=>{const open=list.hidden;list.hidden=!open;toggle.setAttribute('aria-expanded',String(open));toggle.textContent=open?'FECHAR GABARITOS':'BAIXAR GABARITOS';});
 }
 
 function renderFlags(p){
@@ -59,8 +80,7 @@ function renderVariantMatrix(variants,p){
  box.hidden=false;
  const priceLink=document.querySelector('#categoryPriceLink');
  if(priceLink&&p.category_slug)priceLink.href=`/precos.html?category=${encodeURIComponent(p.category_slug)}`;
- const templateCenter=`/gabaritos.html?slug=${encodeURIComponent(p.slug)}#arquivos`;
- rows.innerHTML=variants.map(v=>`<tr><td><strong>${esc(v.name)}</strong>${v.external_code||v.sku?`<small>${esc(v.external_code||v.sku)}</small>`:''}</td><td>${v.quantity?esc(v.quantity):'—'}</td><td>${esc(v.size_label||'—')}</td><td>${esc(v.print_configuration||'—')}</td><td>${v.production_days?`${esc(v.production_days)} dia(s)`:'—'}${v.availability==='on_request'?'<small class="matrix-warning">sob consulta</small>':''}</td><td><strong class="matrix-price">${Number(v.public_price||0)>0?money.format(Number(v.public_price)):'Sob consulta'}</strong></td><td><div class="matrix-actions"><button type="button" class="matrix-select" data-variant-id="${v.id}" ${Number(v.public_price||0)<=0?'disabled':''}>Selecionar</button>${v.gabarito_url?`<a href="${esc(templateCenter)}">Gabaritos</a>`:''}</div></td></tr>`).join('');
+ rows.innerHTML=variants.map(v=>`<tr><td><strong>${esc(v.name)}</strong>${v.external_code||v.sku?`<small>${esc(v.external_code||v.sku)}</small>`:''}</td><td>${v.quantity?esc(v.quantity):'—'}</td><td>${esc(v.size_label||'—')}</td><td>${esc(v.print_configuration||'—')}</td><td>${v.production_days?`${esc(v.production_days)} dia(s)`:'—'}${v.availability==='on_request'?'<small class="matrix-warning">sob consulta</small>':''}</td><td><strong class="matrix-price">${Number(v.public_price||0)>0?money.format(Number(v.public_price)):'Sob consulta'}</strong></td><td><div class="matrix-actions"><button type="button" class="matrix-select" data-variant-id="${v.id}" ${Number(v.public_price||0)<=0?'disabled':''}>Selecionar</button>${v.gabarito_url?'<a href="#templatesBox">Gabaritos</a>':''}</div></td></tr>`).join('');
  rows.addEventListener('click',e=>{const button=e.target.closest('[data-variant-id]');if(!button)return;variantSelect.value=button.dataset.variantId;variantSelect.dispatchEvent(new Event('change'));document.querySelector('.config-panel')?.scrollIntoView({behavior:'smooth',block:'start'});});
 }
 
@@ -76,7 +96,7 @@ async function load(){
  document.querySelector('#productLongDescription').innerHTML=renderDescription(p.description||p.short_description);
  renderFlags(p);renderGallery(p);
  const [verifiedResult,generatedResult]=await Promise.allSettled([api(`/api/v1/products/${encodeURIComponent(slug)}/templates`),api(`/api/v1/products/${encodeURIComponent(slug)}/generated-gabaritos`)]);
- renderTemplates(verifiedResult.status==='fulfilled'?(verifiedResult.value.items||[]):[],generatedResult.status==='fulfilled'?(generatedResult.value.items||[]):[]);
+ renderTemplates(p,verifiedResult.status==='fulfilled'?(verifiedResult.value.items||[]):[],generatedResult.status==='fulfilled'?(generatedResult.value.items||[]):[]);
  const variants=(product.variants||[]).filter(v=>v.availability!=='unavailable');
  renderVariantMatrix(variants,p);
  variantSelect.innerHTML='<option value="">Selecione uma opção</option>'+variants.map(v=>`<option value="${v.id}">${esc(v.name)}${Number(v.public_price||0)>0?` · ${money.format(Number(v.public_price))}`:''}</option>`).join('');
@@ -94,7 +114,7 @@ variantSelect.addEventListener('change',()=>{
    v.print_configuration?`Impressão: <b>${esc(v.print_configuration)}</b>`:'',
    v.production_days?`Produção estimada: <b>${esc(v.production_days)} dia(s)</b>`:'',
    v.availability==='on_request'?'Disponibilidade: <b>sob consulta</b>':'Disponibilidade: <b>disponível</b>',
-   v.gabarito_url?`Gabaritos: <a href="/gabaritos.html?slug=${encodeURIComponent(product.product.slug)}#arquivos">baixar SVG, PDF, EPS ou PSD</a>`:''
+   v.gabarito_url?'Gabaritos: <a href="#templatesBox">usar o botão BAIXAR GABARITOS abaixo</a>':''
  ].filter(Boolean).join('<br>');
  addToCart.disabled=Number(v.public_price||0)<=0;
  if(addToCart.disabled)feedback.textContent='Esta opção ainda não possui preço público liberado para pedido online.';
