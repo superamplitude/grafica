@@ -1,0 +1,64 @@
+name: Diagnostico gabaritos producao
+
+on:
+  push:
+    branches:
+      - diag/gabarito-click-20260915
+
+jobs:
+  verify-gabaritos:
+    runs-on: [self-hosted]
+    timeout-minutes: 10
+    steps:
+      - name: Verificar producao externa e assets ativos
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          BASE="https://grafica.belastock.com.br"
+          TS="$(date +%s)"
+
+          curl -fsS -H 'Cache-Control: no-cache' "$BASE/catalogo.html?diag=$TS" -o /tmp/cp-catalogo.html
+          curl -fsS -H 'Cache-Control: no-cache' "$BASE/produto.html?diag=$TS" -o /tmp/cp-produto.html
+          curl -fsS -H 'Cache-Control: no-cache' "$BASE/assets/catalog.js?v=20260915-8&diag=$TS" -o /tmp/cp-catalog.js
+          curl -fsS -H 'Cache-Control: no-cache' "$BASE/assets/product.js?v=20260915-8&diag=$TS" -o /tmp/cp-product.js
+
+          grep -q '/assets/catalog.js?v=20260915-8' /tmp/cp-catalogo.html
+          grep -q '/assets/product.js?v=20260915-8' /tmp/cp-produto.html
+          ! grep -q 'gabarito-compact.js' /tmp/cp-catalogo.html
+          ! grep -q 'gabarito-compact.js' /tmp/cp-produto.html
+
+          grep -q "const FORMAT_ORDER=\['cdr','ai','psd','pdf','svg'\]" /tmp/cp-catalog.js
+          grep -q 'function gabaritoBar' /tmp/cp-catalog.js
+          grep -q "box.innerHTML=gabaritoBar(files)" /tmp/cp-catalog.js
+          ! grep -q 'MutationObserver' /tmp/cp-catalog.js
+
+          grep -q "const TEMPLATE_ORDER=\['cdr','ai','psd','pdf','svg'\]" /tmp/cp-product.js
+          grep -q 'function formatLinks' /tmp/cp-product.js
+          grep -q 'gabarito-format-bar' /tmp/cp-product.js
+          ! grep -q 'MutationObserver' /tmp/cp-product.js
+
+          curl -fsS "$BASE/api/release" -o /tmp/cp-release.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const r=JSON.parse(fs.readFileSync('/tmp/cp-release.json','utf8'));
+          if(r?.release?.commit!=='e0803596b9db0f698128912859be1d93ca4a4c3f'){
+            console.error('RELEASE_MISMATCH',r);
+            process.exit(1);
+          }
+          console.log('RELEASE_OK='+r.release.commit);
+          NODE
+
+          curl -fsS "$BASE/api/v1/products?limit=1&offset=0&sort=featured" -o /tmp/cp-products.json
+          SLUG="$(node -e "const d=require('/tmp/cp-products.json'); process.stdout.write(d.items?.[0]?.slug||'')")"
+          test -n "$SLUG"
+          curl -fsS "$BASE/api/v1/products/$SLUG/generated-gabaritos" -o /tmp/cp-generated.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('/tmp/cp-generated.json','utf8'));
+          const set=new Set();
+          for(const item of d.items||[]) for(const f of item.formats||[]) set.add(String(f.format||'').toLowerCase());
+          for(const required of ['psd','pdf','svg']) if(!set.has(required)) throw new Error('MISSING_'+required.toUpperCase());
+          console.log('GENERATED_FORMATS='+[...set].sort().join(','));
+          NODE
+
+          echo 'GABARITO_INLINE_PRODUCTION=OK'
