@@ -27,6 +27,9 @@ async function variantByCode(code){
     printConfiguration:row.print_configuration
   };
 }
+function downloadName(meta,ext){
+  return `${safeFileName(meta.productName)}-${safeFileName(meta.code)}.${ext}`;
+}
 
 export async function registerGeneratedAssetRoutes(app){
   app.get('/api/v1/products/:slug/preview.svg',async(request,reply)=>{
@@ -41,28 +44,28 @@ export async function registerGeneratedAssetRoutes(app){
     const code=String(request.params.code||'').trim();
     const meta=await variantByCode(code);
     if(!meta) return reply.code(404).send({error:'VARIANT_NOT_FOUND'});
-    return svgReply(reply,renderVariantGabaritoSvg(meta),`gabarito-${meta.code}.svg`,String(request.query?.download||'')==='1');
+    return svgReply(reply,renderVariantGabaritoSvg(meta),downloadName(meta,'svg'),String(request.query?.download||'')==='1');
   });
 
   app.get('/api/v1/gabaritos/:code.pdf',async(request,reply)=>{
     const code=String(request.params.code||'').trim();
     const meta=await variantByCode(code);
     if(!meta) return reply.code(404).send({error:'VARIANT_NOT_FOUND'});
-    return assetReply(reply,renderVariantGabaritoPdf(meta),{contentType:'application/pdf',fileName:`gabarito-${meta.code}.pdf`});
+    return assetReply(reply,renderVariantGabaritoPdf(meta),{contentType:'application/pdf',fileName:downloadName(meta,'pdf')});
   });
 
   app.get('/api/v1/gabaritos/:code.eps',async(request,reply)=>{
     const code=String(request.params.code||'').trim();
     const meta=await variantByCode(code);
     if(!meta) return reply.code(404).send({error:'VARIANT_NOT_FOUND'});
-    return assetReply(reply,renderVariantGabaritoEps(meta),{contentType:'application/postscript; charset=us-ascii',fileName:`gabarito-${meta.code}.eps`});
+    return assetReply(reply,renderVariantGabaritoEps(meta),{contentType:'application/postscript; charset=us-ascii',fileName:downloadName(meta,'eps')});
   });
 
   app.get('/api/v1/gabaritos/:code.psd',async(request,reply)=>{
     const code=String(request.params.code||'').trim();
     const meta=await variantByCode(code);
     if(!meta) return reply.code(404).send({error:'VARIANT_NOT_FOUND'});
-    return assetReply(reply,renderVariantGabaritoPsd(meta),{contentType:'image/vnd.adobe.photoshop',fileName:`gabarito-${meta.code}.psd`,cache:false});
+    return assetReply(reply,renderVariantGabaritoPsd(meta),{contentType:'image/vnd.adobe.photoshop',fileName:downloadName(meta,'psd'),cache:false});
   });
 
   app.get('/api/v1/products/:slug/generated-gabaritos',async(request,reply)=>{
@@ -78,25 +81,26 @@ export async function registerGeneratedAssetRoutes(app){
       if(seen.has(key)) continue;
       seen.add(key);
       const code=String(row.external_code||row.sku||row.id);
+      const meta={productName:products[0].name,code};
       const base=`/api/v1/gabaritos/${encodeURIComponent(code)}`;
       const svgPath=`${base}.svg`;
       items.push({
         code,
+        product_name:products[0].name,
+        reference:code,
         template_type:'multi',
-        label:'Gabarito editável',
+        label:'Gabarito',
         side:'general',
         size_label:row.size_label||null,
         print_configuration:row.print_configuration||null,
         url:svgPath,
         download_url:`${svgPath}?download=1`,
         formats:[
-          {format:'svg',label:'SVG',url:`${svgPath}?download=1`,vector:true,editable:true},
-          {format:'pdf',label:'PDF',url:`${base}.pdf`,vector:true,editable:false},
-          {format:'eps',label:'EPS',url:`${base}.eps`,vector:true,editable:true},
-          {format:'psd',label:'PSD',url:`${base}.psd`,vector:false,editable:true}
+          {format:'psd',label:'PSD',file_name:downloadName(meta,'psd'),url:`${base}.psd`},
+          {format:'pdf',label:'PDF',file_name:downloadName(meta,'pdf'),url:`${base}.pdf`},
+          {format:'svg',label:'SVG',file_name:downloadName(meta,'svg'),url:`${svgPath}?download=1`}
         ],
-        source:'supplier_price_table',
-        note:'Dimensão final conforme tabela importada; sangria e área segura não são presumidas. CDR/AI nativos aparecem apenas quando houver arquivo original homologado.'
+        source:'supplier_price_table'
       });
     }
     return {product:{id:Number(products[0].id),name:products[0].name,slug:products[0].slug},items,total:items.length};
