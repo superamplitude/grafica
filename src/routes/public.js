@@ -10,23 +10,18 @@ function withPublicUrl(row, keyField = 'object_key', targetField = 'url') {
   return { ...row, [targetField]: row?.[keyField] ? publicObjectUrl(row[keyField]) : null };
 }
 
-function absoluteUrl(request,path){
-  const proto=String(request?.headers?.['x-forwarded-proto']||request?.protocol||'https').split(',')[0].trim()||'https';
-  const host=String(request?.headers?.['x-forwarded-host']||request?.headers?.host||'grafica.belastock.com.br').split(',')[0].trim();
-  return `${proto}://${host}${path}`;
-}
-
 function productLinks(request,slug,coverKey=null){
   const encoded=encodeURIComponent(slug);
-  const preview=absoluteUrl(request,`/api/v1/products/${encoded}/preview.svg`);
+  const preview=`/api/v1/products/${encoded}/preview.svg`;
   const cover=coverKey?publicObjectUrl(coverKey):null;
   return {
     cover_url:cover,
     technical_preview_url:preview,
     image_url:cover||preview,
     image_type:cover?'real_photo':'technical_preview',
-    gabaritos_url:absoluteUrl(request,`/api/v1/products/${encoded}/generated-gabaritos`),
-    product_url:absoluteUrl(request,`/produto.html?slug=${encoded}`)
+    gabaritos_url:`/gabaritos.html?slug=${encoded}`,
+    gabaritos_api_url:`/api/v1/products/${encoded}/generated-gabaritos`,
+    product_url:`/produto.html?slug=${encoded}`
   };
 }
 
@@ -91,8 +86,8 @@ async function productPayloadBySlug(slug,request) {
       quantity: Number(row.quantity || 0),
       attributes_json: asJson(row.attributes_json),
       production_json: asJson(row.production_json),
-      gabarito_url:absoluteUrl(request,`/api/v1/gabaritos/${encodeURIComponent(row.external_code||row.sku||row.id)}.svg`),
-      gabarito_download_url:absoluteUrl(request,`/api/v1/gabaritos/${encodeURIComponent(row.external_code||row.sku||row.id)}.svg?download=1`)
+      gabarito_url:`/api/v1/gabaritos/${encodeURIComponent(row.external_code||row.sku||row.id)}.svg`,
+      gabarito_download_url:`/api/v1/gabaritos/${encodeURIComponent(row.external_code||row.sku||row.id)}.svg?download=1`
     })),
     media,
     templates: templates.map((row) => ({ ...row, url: row.object_key ? publicObjectUrl(row.object_key) : row.external_url }))
@@ -252,6 +247,7 @@ export async function registerPublicRoutes(app) {
         image_type:product.image_type,
         technical_preview_url:product.technical_preview_url,
         gabaritos_url:product.gabaritos_url,
+        gabaritos_api_url:product.gabaritos_api_url,
         product_url:product.product_url
       },
       variants: product.variants.filter((variant) => variant.availability !== 'unavailable'),
@@ -282,7 +278,7 @@ export async function registerPublicRoutes(app) {
       production_days: variant.production_days,
       price: Number(variant.public_price || 0),
       currency: 'BRL',
-      gabarito_url:absoluteUrl(request,`/api/v1/gabaritos/${encodeURIComponent(variant.external_code||variant.sku)}.svg`)
+      gabarito_url:`/api/v1/gabaritos/${encodeURIComponent(variant.external_code||variant.sku)}.svg`
     };
   });
 
