@@ -1,53 +1,68 @@
-const PHOTOS={
-  cards:'https://images.pexels.com/photos/8947634/pexels-photo-8947634.jpeg?auto=compress&cs=tinysrgb&w=1260',
-  flyer:'https://images.pexels.com/photos/8217368/pexels-photo-8217368.jpeg?auto=compress&cs=tinysrgb&w=1260',
-  labels:'https://images.pexels.com/photos/8066772/pexels-photo-8066772.png?auto=compress&cs=tinysrgb&w=1260',
-  banner:'https://images.pexels.com/photos/12883028/pexels-photo-12883028.jpeg?auto=compress&cs=tinysrgb&w=1260',
-  folder:'https://images.pexels.com/photos/8947698/pexels-photo-8947698.jpeg?auto=compress&cs=tinysrgb&w=1260',
-  stationery:'https://images.pexels.com/photos/5420979/pexels-photo-5420979.jpeg?auto=compress&cs=tinysrgb&w=1260',
-  bags:'https://images.pexels.com/photos/12024975/pexels-photo-12024975.jpeg?auto=compress&cs=tinysrgb&w=1260',
-  mug:'https://images.pexels.com/photos/6312237/pexels-photo-6312237.jpeg?auto=compress&cs=tinysrgb&w=1260',
-  apparel:'https://images.pexels.com/photos/12025472/pexels-photo-12025472.jpeg?auto=compress&cs=tinysrgb&w=1260',
-  generic:'https://images.pexels.com/photos/8533348/pexels-photo-8533348.jpeg?auto=compress&cs=tinysrgb&w=1260'
-};
+const R2_PUBLIC_BASE='https://arquivos.belastock.com.br';
+const COVER_EXTENSIONS=['webp','jpg','jpeg','png'];
 
-const RULES=[
-  [/camiset|camisa|uniforme|vestu[aá]rio|tecido|dtf\b/i,'apparel'],
-  [/caneca|copo|squeeze|garrafa/i,'mug'],
-  [/sacola|saco\b|embalagem|packaging|caixa/i,'bags'],
-  [/banner|lona|wind|faixa|placa|totem|display|backdrop/i,'banner'],
-  [/pasta|porta[- ]?document|folder executivo/i,'folder'],
-  [/adesiv|r[oó]tulo|rotulo|etiquet|sticker|lacr|vinil|bopp/i,'labels'],
-  [/flyer|panfleto|folheto|brochura|encarte|cartaz|folder/i,'flyer'],
-  [/cart[aã]o|cartao|crach[aá]|tag\b|im[aã]|marcador/i,'cards'],
-  [/papel|timbrado|envelope|bloco|caderno|receitu[aá]rio|convite|calend[aá]rio|agenda|caneta|r[eé]gua/i,'stationery']
-];
+function cleanSlug(value=''){
+  return String(value||'').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
+}
 
-function productText(item={}){
-  return [item.name,item.category_name,item.category_slug,item.slug].filter(Boolean).join(' ');
+export function productCoverCandidates(item={}){
+  const slug=cleanSlug(item.slug);
+  if(!slug)return [];
+  return COVER_EXTENSIONS.map(ext=>`${R2_PUBLIC_BASE}/products/photos/${encodeURIComponent(slug)}/cover.${ext}`);
 }
 
 export function catalogPhoto(item={}){
-  const text=productText(item);
-  const match=RULES.find(([pattern])=>pattern.test(text));
-  return PHOTOS[match?.[1]||'generic'];
+  return productCoverCandidates(item)[0]||'';
+}
+
+function isTechnical(url=''){
+  const value=String(url||'');
+  return value.includes('/preview.svg')||value.endsWith('.svg');
 }
 
 export function preferredProductImage(item={}){
   const primary=item.cover_url||item.image_url||'';
-  const technical=item.image_type==='technical_preview'||String(primary).includes('/preview.svg')||String(primary).endsWith('.svg');
-  if(primary&&!technical)return primary;
-  return catalogPhoto(item);
+  if(primary&&!isTechnical(primary)&&item.image_type!=='technical_preview')return primary;
+  return catalogPhoto(item)||primary||item.technical_preview_url||'';
+}
+
+function r2CoverVariants(current=''){
+  try{
+    const url=new URL(current,location.origin);
+    if(url.origin!==new URL(R2_PUBLIC_BASE).origin)return [];
+    const match=url.pathname.match(/^(\/products\/photos\/[^/]+\/cover)\.(webp|jpe?g|png)$/i);
+    if(!match)return [];
+    return COVER_EXTENSIONS.map(ext=>`${R2_PUBLIC_BASE}${match[1]}.${ext}`);
+  }catch{return [];}
+}
+
+function sameUrl(a,b){
+  try{return new URL(a,location.origin).href===new URL(b,location.origin).href;}catch{return a===b;}
 }
 
 export function wireImageFallbacks(root=document){
   for(const image of root.querySelectorAll('img[data-catalog-photo]')){
     if(image.dataset.fallbackWired==='1')continue;
     image.dataset.fallbackWired='1';
+    image.dataset.r2Attempt='0';
     image.addEventListener('error',()=>{
+      const variants=r2CoverVariants(image.src);
+      if(variants.length){
+        const currentIndex=variants.findIndex(url=>sameUrl(url,image.src));
+        const nextIndex=currentIndex>=0?currentIndex+1:Number(image.dataset.r2Attempt||0);
+        if(nextIndex<variants.length){
+          image.dataset.r2Attempt=String(nextIndex+1);
+          image.src=variants[nextIndex];
+          return;
+        }
+      }
       const fallback=image.dataset.fallback;
-      if(fallback&&image.src!==fallback){image.src=fallback;return;}
+      if(fallback&&image.dataset.technicalFallbackUsed!=='1'&&!sameUrl(image.src,fallback)){
+        image.dataset.technicalFallbackUsed='1';
+        image.src=fallback;
+        return;
+      }
       image.closest('.product-image,.main-visual-wrap')?.classList.add('image-load-failed');
-    },{once:false});
+    });
   }
 }
