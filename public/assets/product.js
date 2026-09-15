@@ -54,8 +54,18 @@ function collectTemplateFiles(p,verified=[],generated=[]){
  return files.filter(file=>{const key=`${file.format}|${file.name}|${file.url}`;if(seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>TEMPLATE_ORDER.indexOf(a.format)-TEMPLATE_ORDER.indexOf(b.format)||a.name.localeCompare(b.name,'pt-BR'));
 }
 
-function formatLinks(files){
- return files.map(file=>`<a class="btn secondary gabarito-format-link" href="${esc(file.url)}" title="${esc(file.name)}" ${file.native?'target="_blank" rel="noopener"':`download="${esc(file.name)}"`}>${esc(file.format.toUpperCase())}</a>`).join('');
+function formatLinks(files=[]){
+ const byFormat=new Map();
+ for(const file of files){if(TEMPLATE_ORDER.includes(file.format)&&file.url&&!byFormat.has(file.format))byFormat.set(file.format,file);}
+ return TEMPLATE_ORDER.map((format,index)=>{
+   const file=byFormat.get(format);
+   const separator=index?'<span class="gabarito-format-separator">|</span>':'';
+   const label=esc(format.toUpperCase());
+   const entry=file
+    ?`<a class="gabarito-format-link" href="${esc(file.url)}" title="${esc(file.name)}" ${file.native?'target="_blank" rel="noopener"':`download="${esc(file.name)}"`}>${label}</a>`
+    :`<span class="gabarito-format-unavailable" aria-disabled="true">${label}</span>`;
+   return `${separator}${entry}`;
+ }).join('');
 }
 
 function renderTemplates(p,verified=[],generated=[]){
@@ -63,7 +73,7 @@ function renderTemplates(p,verified=[],generated=[]){
  const box=document.querySelector('#templatesBox');
  if(!productTemplateFiles.length){box.innerHTML='';box.hidden=true;return;}
  box.hidden=false;
- box.innerHTML=`<button type="button" class="btn primary gabarito-toggle" id="gabaritoToggle" aria-expanded="false">GABARITO</button><div class="product-gabarito-list" id="productGabaritoList" hidden>${formatLinks(productTemplateFiles)}</div>`;
+ box.innerHTML=`<button type="button" class="btn primary gabarito-toggle" id="gabaritoToggle" aria-expanded="false">GABARITO</button><div class="product-gabarito-list gabarito-format-bar" id="productGabaritoList" hidden>${formatLinks(productTemplateFiles)}</div>`;
  const toggle=document.querySelector('#gabaritoToggle');
  const list=document.querySelector('#productGabaritoList');
  toggle?.addEventListener('click',()=>{const open=list.hidden;list.hidden=!open;toggle.setAttribute('aria-expanded',String(open));});
@@ -86,7 +96,7 @@ function renderVariantMatrix(variants,p){
  box.hidden=false;
  const priceLink=document.querySelector('#categoryPriceLink');
  if(priceLink&&p.category_slug)priceLink.href=`/precos.html?category=${encodeURIComponent(p.category_slug)}`;
- rows.innerHTML=variants.map(v=>`<tr><td><strong>${esc(v.name)}</strong>${v.external_code||v.sku?`<small>${esc(v.external_code||v.sku)}</small>`:''}</td><td>${v.quantity?esc(v.quantity):'—'}</td><td>${esc(v.size_label||'—')}</td><td>${esc(v.print_configuration||'—')}</td><td>${v.production_days?`${esc(v.production_days)} dia(s)`:'—'}${v.availability==='on_request'?'<small class="matrix-warning">sob consulta</small>':''}</td><td><strong class="matrix-price">${Number(v.public_price||0)>0?money.format(Number(v.public_price)):'Sob consulta'}</strong></td><td><div class="matrix-actions"><button type="button" class="matrix-select" data-variant-id="${v.id}" ${Number(v.public_price||0)<=0?'disabled':''}>Selecionar</button>${v.gabarito_url?`<button type="button" class="btn secondary matrix-gabarito-toggle" data-gabarito-code="${esc(v.external_code||v.sku||v.id)}" aria-expanded="false">Gabarito</button><div class="matrix-gabarito-list" hidden></div>`:''}</div></td></tr>`).join('');
+ rows.innerHTML=variants.map(v=>`<tr><td><strong>${esc(v.name)}</strong>${v.external_code||v.sku?`<small>${esc(v.external_code||v.sku)}</small>`:''}</td><td>${v.quantity?esc(v.quantity):'—'}</td><td>${esc(v.size_label||'—')}</td><td>${esc(v.print_configuration||'—')}</td><td>${v.production_days?`${esc(v.production_days)} dia(s)`:'—'}${v.availability==='on_request'?'<small class="matrix-warning">sob consulta</small>':''}</td><td><strong class="matrix-price">${Number(v.public_price||0)>0?money.format(Number(v.public_price)):'Sob consulta'}</strong></td><td><div class="matrix-actions"><button type="button" class="matrix-select" data-variant-id="${v.id}" ${Number(v.public_price||0)<=0?'disabled':''}>Selecionar</button>${v.gabarito_url?`<button type="button" class="btn secondary matrix-gabarito-toggle" data-gabarito-code="${esc(v.external_code||v.sku||v.id)}" aria-expanded="false">Gabarito</button><div class="matrix-gabarito-list gabarito-format-bar" hidden></div>`:''}</div></td></tr>`).join('');
  rows.addEventListener('click',e=>{
    const selectButton=e.target.closest('[data-variant-id]');
    if(selectButton){variantSelect.value=selectButton.dataset.variantId;variantSelect.dispatchEvent(new Event('change'));document.querySelector('.config-panel')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
