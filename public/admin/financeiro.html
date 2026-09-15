@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Financeiro · Central Prints</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/admin/admin-extra.css">
+  <link rel="stylesheet" href="/admin/financeiro.css">
+</head>
+<body>
+<main class="finance-shell">
+  <header class="finance-top"><div><a href="/admin/">← Super Admin</a><h1>Financeiro</h1><p>Visão comercial de vendas, custos, margem e preços em revisão.</p></div><button id="reload" class="action primary">Atualizar</button></header>
+  <section class="panel period"><label>De<input type="date" id="from"></label><label>Até<input type="date" id="to"></label><button id="applyPeriod" class="action">Aplicar período</button><span id="note"></span></section>
+  <section class="finance-cards" id="summaryCards"><div class="empty">Carregando…</div></section>
+  <section class="finance-grid">
+    <article class="panel"><div class="panel-head"><div><h2>Pedidos por status</h2><p>Valores registrados no período.</p></div></div><div class="table-wrap"><table><thead><tr><th>Status</th><th>Pedidos</th><th>Total</th></tr></thead><tbody id="statusRows"></tbody></table></div></article>
+    <article class="panel"><div class="panel-head"><div><h2>Auditoria de preços</h2><p>Custos extremos permanecem fora da loja até revisão.</p></div></div><div id="pricingAudit" class="pricing-audit"></div><a class="action" href="/admin/precos-fornecedores.html">Abrir custos e preços</a></article>
+  </section>
+  <section class="panel"><div class="panel-head"><div><h2>Produtos com maior venda</h2><p>Receita bruta por item no período selecionado.</p></div></div><div class="table-wrap"><table><thead><tr><th>Produto</th><th>Linhas</th><th>Venda</th></tr></thead><tbody id="topProducts"></tbody></table></div></section>
+</main>
+<script type="module" src="/admin/financeiro.js"></script>
+</body>
+</html>
