@@ -1,0 +1,20 @@
+const esc=(v='')=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+async function loadSite(){const r=await fetch('/api/v1/site/home',{headers:{Accept:'application/json'}});if(!r.ok)throw new Error(`HTTP_${r.status}`);return r.json();}
+function brandMarkup(identity={}){
+  const name=String(identity.brandName||'Central Prints').trim()||'Central Prints';
+  if(identity.logoUrl)return `<img class="site-logo-image" src="${esc(identity.logoUrl)}" alt="${esc(name)}">`;
+  const parts=name.split(/\s+/);const first=parts.shift()||name;const rest=parts.join(' ');
+  return `<strong>${esc(first)}</strong>${rest?`<span>${esc(rest)}</span>`:''}`;
+}
+function applyIdentity(identity={}){for(const brand of document.querySelectorAll('a.brand')){brand.innerHTML=brandMarkup(identity);brand.setAttribute('aria-label',identity.brandName||'Central Prints');}}
+function applyDelivery(delivery={}){const target=document.querySelector('#topbarText')||document.querySelector('.topbar .topbar-inner>span');if(!target)return;target.hidden=delivery.enabled===false;if(delivery.text!=null)target.textContent=String(delivery.text||'');}
+function contactLines(contact={}){const parts=[];if(contact.phone)parts.push(`<a href="tel:${esc(String(contact.phone).replace(/[^+\d]/g,''))}">${esc(contact.phone)}</a>`);if(contact.whatsapp)parts.push(`<span>WhatsApp: ${esc(contact.whatsapp)}</span>`);if(contact.email)parts.push(`<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>`);const address=[contact.address,contact.city,contact.state,contact.zip].filter(Boolean).join(' · ');if(address)parts.push(`<span>${esc(address)}</span>`);return parts;}
+function applyFooter(blocks={}){
+  const footer=blocks.footer?.content||{};const body=document.querySelector('#footerBody')||document.querySelector('footer .footer-grid p');if(body&&footer.body!=null)body.textContent=footer.body;
+  const contact=blocks.site_contact?.content||{};const lines=contactLines(contact);const grid=document.querySelector('footer .footer-grid');if(grid&&lines.length){let box=grid.querySelector('.site-contact-block');if(!box){box=document.createElement('div');box.className='site-contact-block';grid.appendChild(box);}box.innerHTML=`<h3>Contato</h3>${lines.join('')}`;}
+  let legal=document.querySelector('.site-footer-legal');const footerEl=document.querySelector('footer');if(footerEl&&footer.legal){if(!legal){legal=document.createElement('div');legal.className='site-footer-legal';footerEl.appendChild(legal);}legal.textContent=footer.legal;}else legal?.remove();
+}
+function renderCustomBlocks(items=[]){const host=document.querySelector('#customBlocks');if(!host)return;const active=items.filter(item=>item&&item.enabled!==false&&(item.title||item.body||item.ctaLabel));host.hidden=!active.length;host.innerHTML=active.map((item,index)=>`<section class="managed-home-block"><div class="container"><div class="managed-home-card"><span class="eyebrow">${String(index+1).padStart(2,'0')}</span>${item.title?`<h2>${esc(item.title)}</h2>`:''}${item.body?`<p>${esc(item.body)}</p>`:''}${item.ctaLabel&&item.ctaUrl?`<a class="btn secondary" href="${esc(item.ctaUrl)}">${esc(item.ctaLabel)}</a>`:''}</div></div></section>`).join('');}
+function renderFaq(items=[]){const host=document.querySelector('#faqSection');if(!host)return;const active=items.filter(item=>item?.question&&item?.answer);host.hidden=!active.length;host.innerHTML=active.length?`<div class="container"><div class="section-head"><div><span>Ajuda</span><h2>Perguntas frequentes</h2></div></div><div class="site-faq-list">${active.map(item=>`<details><summary>${esc(item.question)}</summary><p>${esc(item.answer)}</p></details>`).join('')}</div></div>`:'';}
+function applyBlocks(blocks={}){applyIdentity(blocks.site_identity?.content||{});applyDelivery(blocks.delivery_notice?.content||blocks.topbar?.content||{});applyFooter(blocks);renderCustomBlocks(blocks.home_blocks?.content?.items||[]);renderFaq(blocks.faq?.content?.items||[]);}
+try{const data=await loadSite();applyBlocks(data.blocks||{});}catch{}
