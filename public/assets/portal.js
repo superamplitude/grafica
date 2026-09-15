@@ -1,5 +1,5 @@
 import { preferredProductImage, wireImageFallbacks } from './catalog-photos.js';
-import { setupProductMenu } from './nav-menu.js';
+import { setupProductMenu } from './nav-menu-v3.js';
 
 const money=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const categoryGrid=document.querySelector('#categoryGrid');
@@ -53,7 +53,7 @@ function applyHero(campaign){
   document.querySelector('#heroBody').textContent=campaign?.body||heroBase.body;
   const primary=document.querySelector('#heroPrimary'),secondary=document.querySelector('#heroSecondary');
   primary.textContent=campaign?.cta_label||heroBase.primaryLabel;primary.href=campaign?.cta_url||heroBase.primaryUrl;
-  secondary.textContent=campaign?.secondary_cta_label||heroBase.secondaryLabel;secondary.href=campaign?.secondary_cta_url||heroBase.secondaryUrl;
+  secondary.textContent=campaign?.secondary_cta_label||heroBase.secondaryLabel;secondary.href=campaign?.secondaryUrl||heroBase.secondaryUrl;
   const image=campaign?responsiveCampaignImage(campaign):null;
   if(image&&heroVisual){heroVisual.style.background=`url("${String(image).replaceAll('"','%22')}") center/cover no-repeat`;heroVisual.innerHTML='';heroVisual.classList.add('has-image');}
   else if(heroVisual){heroVisual.style.background='';heroVisual.innerHTML=defaultHeroVisualHtml;heroVisual.classList.remove('has-image');}
