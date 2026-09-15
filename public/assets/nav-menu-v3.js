@@ -9,22 +9,31 @@ async function loadCategories(){
   return Array.isArray(data.items)?data.items:[];
 }
 
+function chunkStandalone(items,size=16){
+  const sorted=[...items].sort((a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR',{numeric:true}));
+  const groups=[];
+  for(let i=0;i<sorted.length;i+=size){
+    const slice=sorted.slice(i,i+size);
+    const first=String(slice[0]?.name||'').charAt(0).toUpperCase();
+    const last=String(slice.at(-1)?.name||'').charAt(0).toUpperCase();
+    groups.push({title:first&&last&&first!==last?`Categorias ${first}–${last}`:'Categorias',slug:null,items:slice});
+  }
+  return groups;
+}
+
 function buildGroups(items){
   const byId=new Map(items.map(item=>[Number(item.id),item]));
   const active=items.filter(item=>Number(item.product_count||0)>0);
+  const groupedParents=new Set();
   const groups=new Map();
-  const standalone=[];
 
   for(const item of active){
     const parentId=Number(item.parent_id||0);
     const parent=parentId?byId.get(parentId):null;
-    if(parent){
-      const key=Number(parent.id);
-      if(!groups.has(key))groups.set(key,{parent,children:[]});
-      groups.get(key).children.push(item);
-    }else{
-      standalone.push(item);
-    }
+    if(!parent)continue;
+    groupedParents.add(Number(parent.id));
+    if(!groups.has(Number(parent.id)))groups.set(Number(parent.id),{parent,children:[]});
+    groups.get(Number(parent.id)).children.push(item);
   }
 
   const result=[...groups.values()].map(group=>({
@@ -33,15 +42,10 @@ function buildGroups(items){
     items:group.children.sort((a,b)=>Number(b.product_count||0)-Number(a.product_count||0)||String(a.name).localeCompare(String(b.name),'pt-BR'))
   }));
 
-  if(standalone.length){
-    result.push({
-      title:'Outros produtos',
-      slug:null,
-      items:standalone.sort((a,b)=>Number(b.product_count||0)-Number(a.product_count||0)||String(a.name).localeCompare(String(b.name),'pt-BR'))
-    });
-  }
+  const standalone=active.filter(item=>!Number(item.parent_id||0)&&!groupedParents.has(Number(item.id)));
+  result.push(...chunkStandalone(standalone));
 
-  return result.sort((a,b)=>String(a.title).localeCompare(String(b.title),'pt-BR'));
+  return result.filter(group=>group.items.length||group.slug).sort((a,b)=>String(a.title).localeCompare(String(b.title),'pt-BR'));
 }
 
 function groupMarkup(group){
@@ -81,7 +85,7 @@ export async function setupProductMenu(){
     const items=await loadCategories();
     const groups=buildGroups(items);
     const populated=items.filter(item=>Number(item.product_count||0)>0).length;
-    panel.innerHTML=`<div class="mega-menu-head"><div><span>Catálogo completo</span><strong>Todos os produtos</strong></div><a class="mega-menu-all" href="/catalogo.html">Ver os ${populated.toLocaleString('pt-BR')} grupos/produtos →</a></div><div class="mega-menu-columns">${groups.map(groupMarkup).join('')}</div>`;
+    panel.innerHTML=`<div class="mega-menu-head"><div><span>Catálogo completo</span><strong>Todos os produtos</strong></div><a class="mega-menu-all" href="/catalogo.html">Ver catálogo completo (${populated.toLocaleString('pt-BR')}) →</a></div><div class="mega-menu-columns">${groups.map(groupMarkup).join('')}</div>`;
   }catch{
     panel.innerHTML='<a class="mega-menu-all standalone" href="/catalogo.html">Ver todos os produtos →</a>';
   }
