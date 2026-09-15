@@ -12,8 +12,8 @@
   <header class="header">
     <div class="container header-main">
       <a class="brand" href="/" aria-label="Central Prints"><strong>CENTRAL</strong><span>PRINTS</span></a>
-      <form class="search" id="searchForm"><input id="searchInput" type="search" placeholder="O que você está procurando?" autocomplete="off"><button>Buscar</button></form>
-      <div class="quick"><a href="/pedido.html">Pedidos</a><a href="/checkout.html">Carrinho <b id="cartCount">0</b></a></div>
+      <form class="search" id="searchForm"><input id="searchInput" type="search" placeholder="Busque por cartão, adesivo, banner, flyer..." autocomplete="off"><button>Buscar</button></form>
+      <div class="quick"><a href="/pedido.html"><span>Meus</span> Pedidos</a><a href="/checkout.html">Carrinho <b id="cartCount">0</b></a></div>
     </div>
     <div class="navrow"><div class="container nav-inner"><a class="all-products" href="/catalogo.html">☰ Todos os produtos</a><nav id="primaryNav"><a href="/catalogo.html?category=cartoes-de-visita">Cartões</a><a href="/catalogo.html?category=panfletos-e-flyers">Flyers</a><a href="/catalogo.html?category=adesivos-e-rotulos">Adesivos</a><a href="/catalogo.html?category=banners-e-lonas">Banners</a><a href="/catalogo.html?category=papelaria">Papelaria</a><a class="offer" href="/catalogo.html?featured=1">Destaques</a></nav></div></div>
   </header>
@@ -23,9 +23,23 @@
 
     <section class="trust"><div class="container trust-grid" id="trustGrid"><article><i>✓</i><div><strong>Compra segura</strong><span>Ambiente protegido</span></div></article><article><i>★</i><div><strong>Qualidade</strong><span>Impressão profissional</span></div></article><article><i>↗</i><div><strong>Produção ágil</strong><span>Prazos transparentes</span></div></article><article><i>✎</i><div><strong>Personalização</strong><span>Arte agora ou depois</span></div></article><article><i>☏</i><div><strong>Atendimento</strong><span>Suporte humano</span></div></article></div></section>
 
-    <section class="section" id="categorias"><div class="container"><div class="section-head"><div><span>Encontre rapidamente</span><h2>Categorias de produtos</h2><p>Um catálogo organizado para você chegar mais rápido ao produto certo.</p></div><a href="/catalogo.html">Ver catálogo completo →</a></div><div class="category-grid" id="categoryGrid"><div class="loading">Carregando categorias…</div></div></div></section>
+    <section class="section storefront-section" id="produtos">
+      <div class="container storefront-layout">
+        <aside class="catalog-sidebar" aria-label="Categorias de produtos">
+          <div class="catalog-sidebar-head"><span>Comprar por</span><h2>Categorias</h2></div>
+          <nav id="categoryRail"><div class="loading compact">Carregando categorias…</div></nav>
+          <a class="catalog-sidebar-all" href="/catalogo.html">Ver todas as categorias →</a>
+          <div class="catalog-help"><strong>Não encontrou?</strong><span>Use a busca acima ou fale com nosso atendimento.</span><a href="#atendimento">Preciso de ajuda</a></div>
+        </aside>
+        <div class="storefront-products">
+          <div class="section-head compact-head"><div><span>Vitrine Central Prints</span><h2>Produtos em destaque</h2><p>Escolha o produto e configure formato, impressão, quantidade e prazo.</p></div><a href="/catalogo.html" id="catalogStatus">Ver todos →</a></div>
+          <div class="storefront-shortcuts"><a href="/catalogo.html?featured=1"><b>★</b><span><strong>Destaques</strong><small>Seleção da Central Prints</small></span></a><a href="/catalogo.html?q=cart%C3%A3o"><b>▣</b><span><strong>Cartões</strong><small>Opções para sua marca</small></span></a><a href="/catalogo.html?q=adesivo"><b>◆</b><span><strong>Adesivos</strong><small>Rótulos e comunicação</small></span></a></div>
+          <div class="product-grid storefront-grid" id="productGrid"><div class="loading">Carregando produtos…</div></div>
+        </div>
+      </div>
+    </section>
 
-    <section class="section products-section" id="produtos"><div class="container"><div class="section-head"><div><span>Catálogo</span><h2>Produtos em destaque</h2><p>Escolha uma opção e configure formato, impressão, quantidade e prazo.</p></div><a href="/catalogo.html" id="catalogStatus">Ver todos →</a></div><div class="product-grid" id="productGrid"><div class="loading">Carregando produtos…</div></div></div></section>
+    <section class="section category-showcase" id="categorias"><div class="container"><div class="section-head"><div><span>Encontre rapidamente</span><h2>Explore o catálogo</h2><p>As categorias com mais opções aparecem primeiro. O catálogo completo continua disponível na busca.</p></div><a href="/catalogo.html">Ver catálogo completo →</a></div><div class="category-grid" id="categoryGrid"><div class="loading">Carregando categorias…</div></div></div></section>
 
     <section class="how section" id="como-funciona"><div class="container"><div class="section-head"><div><span>Fluxo simples</span><h2>Da configuração à produção</h2></div></div><div class="steps"><article><b>1</b><h3>Configure</h3><p>Escolha formato, quantidade, impressão, acabamento e prazo entre as opções publicadas.</p></article><article><b>2</b><h3>Envie a arte</h3><p>Envie a arte quando o pedido estiver pronto para receber arquivos ou solicite apoio técnico.</p></article><article><b>3</b><h3>Aprove a prova</h3><p>Quando aplicável, o arquivo passa pela validação técnica antes da liberação para produção.</p></article><article><b>4</b><h3>Acompanhe</h3><p>Consulte o andamento do pedido, produção, expedição e rastreamento.</p></article></div></div></section>
 
