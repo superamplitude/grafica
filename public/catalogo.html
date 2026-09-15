@@ -5,10 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Catálogo · Central Prints</title>
   <meta name="description" content="Catálogo Central Prints: encontre produtos gráficos, personalize e configure online.">
-  <link rel="stylesheet" href="/assets/portal.css?v=20260915-4">
-  <link rel="stylesheet" href="/assets/catalog.css?v=20260915-4">
-  <link rel="stylesheet" href="/assets/visual-runtime.css?v=20260915-4">
-  <link rel="stylesheet" href="/assets/gabarito-compact.css?v=20260915-7">
+  <link rel="stylesheet" href="/assets/portal.css?v=20260915-6">
+  <link rel="stylesheet" href="/assets/catalog.css?v=20260915-5">
+  <link rel="stylesheet" href="/assets/storefront-v2.css?v=20260915-1">
 </head>
 <body>
   <div class="topbar"><div class="container topbar-inner"><span>Frete para todo o Brasil • Produção acompanhada do início ao fim</span><nav><a href="/precos.html">Tabela de preços</a><a href="/pedido.html">Acompanhar pedido</a><a href="/#atendimento">Atendimento</a></nav></div></div>
@@ -16,14 +15,14 @@
     <div class="container header-main catalog-header-main">
       <button class="menu-button" id="menuButton" aria-label="Abrir filtros">☰</button>
       <a class="brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a>
-      <form class="search" id="catalogSearch"><input id="catalogSearchInput" type="search" placeholder="Busque por cartão, flyer, banner, adesivo..." autocomplete="off"><button>Buscar</button></form>
+      <form class="search" id="catalogSearch"><input id="catalogSearchInput" type="search" placeholder="O que você precisa imprimir?" autocomplete="off"><button>Buscar</button></form>
       <div class="quick"><a href="/precos.html">Preços</a><a href="/pedido.html">Pedidos</a><a href="/checkout.html">Carrinho <b id="cartCount">0</b></a></div>
     </div>
-    <div class="navrow"><div class="container nav-inner"><a class="all-products active-link" href="/catalogo.html">☰ Todos os produtos</a><nav><a href="/catalogo.html?category=cartoes-de-visita">Cartões</a><a href="/catalogo.html?category=panfletos-e-flyers">Flyers</a><a href="/catalogo.html?category=adesivos-e-rotulos">Adesivos</a><a href="/catalogo.html?category=banners-e-lonas">Banners</a><a href="/catalogo.html?category=papelaria">Papelaria</a><a href="/precos.html">Tabela de preços</a><a class="offer" href="/catalogo.html?featured=1">Destaques</a></nav></div></div>
+    <div class="navrow"><div class="container nav-inner"><a class="all-products active-link" href="/catalogo.html">☰ Todos os produtos</a><nav><a href="/catalogo.html?category=cartoes-de-visita">Cartões</a><a href="/catalogo.html?category=panfletos-e-flyers">Flyers</a><a href="/catalogo.html?category=adesivos-e-rotulos">Adesivos</a><a href="/catalogo.html?category=banners-e-lonas">Banners</a><a href="/catalogo.html?category=papelaria">Papelaria</a><a class="offer" href="/catalogo.html?featured=1">Destaques</a></nav></div></div>
   </header>
 
   <main>
-    <section class="catalog-hero"><div class="container"><nav class="breadcrumbs"><a href="/">Início</a><span>›</span><strong>Catálogo</strong></nav><div class="catalog-hero-grid"><div><span class="eyebrow">Catálogo Central Prints</span><h1>Escolha, configure e produza.</h1><p>Produtos gráficos organizados por categoria, com variantes, prazos e especificações validados antes da publicação.</p></div><div class="catalog-summary" id="catalogSummary"><article><strong>—</strong><span>Produtos</span></article><article><strong>—</strong><span>Categorias</span></article><article><strong>—</strong><span>Opções</span></article></div></div></div></section>
+    <section class="catalog-hero"><div class="container"><nav class="breadcrumbs"><a href="/">Início</a><span>›</span><strong>Catálogo</strong></nav><div class="catalog-hero-grid"><div><span class="eyebrow">Central Prints</span><h1>Escolha seu produto.</h1><p>Encontre o material, veja o preço inicial e abra os detalhes para configurar.</p></div><div class="catalog-summary" id="catalogSummary"><article><strong>—</strong><span>Produtos</span></article><article><strong>—</strong><span>Categorias</span></article><article><strong>—</strong><span>Opções</span></article></div></div></div></section>
 
     <section class="catalog-body section"><div class="container catalog-layout">
       <aside class="catalog-sidebar" id="catalogSidebar">
@@ -34,19 +33,17 @@
         <button class="btn primary full" type="button" id="applyFilters">Aplicar filtros</button>
         <button class="clear-filter" type="button" id="clearFilters">Limpar filtros</button>
       </aside>
-
       <div class="catalog-content">
         <div class="catalog-toolbar"><div><button class="filter-mobile" id="openFilters" type="button">☰ Filtros</button><strong id="resultTitle">Todos os produtos</strong><span id="resultCount"></span></div><label>Ordenar<select id="sortSelect"><option value="featured">Relevância</option><option value="name">Nome A–Z</option><option value="price-asc">Menor preço</option><option value="price-desc">Maior preço</option><option value="newest">Mais recentes</option></select></label></div>
         <div class="active-filters" id="activeFilters"></div>
         <div class="product-grid catalog-grid" id="catalogGrid"><div class="loading">Carregando catálogo…</div></div>
         <div class="catalog-pagination"><button type="button" id="prevPage">← Anterior</button><span id="pageLabel">Página 1</span><button type="button" id="nextPage">Próxima →</button></div>
       </div>
-    </section></div></section>
+    </div></section>
   </main>
 
-  <footer id="atendimento"><div class="footer-cta"><div class="container"><div><span>Atendimento especializado</span><h2>Não encontrou o que precisa?</h2><p>Fale com a Central Prints e descreva seu projeto.</p></div><a class="btn light" href="/#atendimento">Falar com atendimento</a></div></div><div class="container footer-grid"><div><a class="brand footer-brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a><p>Gráfica online com configuração inteligente, gabaritos profissionais e acompanhamento do pedido.</p></div><div><h3>Compre</h3><a href="/catalogo.html">Todos os produtos</a><a href="/precos.html">Tabela de preços</a><a href="/checkout.html">Carrinho</a></div><div><h3>Pedidos</h3><a href="/pedido.html">Acompanhar pedido</a><a href="/#como-funciona">Como funciona</a></div><div><h3>Atendimento</h3><a href="/#atendimento">Fale conosco</a><a href="/admin/">Área administrativa</a></div></div></footer>
+  <footer id="atendimento"><div class="footer-cta"><div class="container"><div><span>Atendimento especializado</span><h2>Não encontrou o que precisa?</h2><p>Fale com a Central Prints e descreva seu projeto.</p></div><a class="btn light" href="/#atendimento">Falar com atendimento</a></div></div><div class="container footer-grid"><div><a class="brand footer-brand" href="/"><strong>CENTRAL</strong><span>PRINTS</span></a><p>Gráfica online com produtos personalizados, gabaritos e acompanhamento do pedido.</p></div><div><h3>Compre</h3><a href="/catalogo.html">Todos os produtos</a><a href="/precos.html">Tabela de preços</a><a href="/checkout.html">Carrinho</a></div><div><h3>Pedidos</h3><a href="/pedido.html">Acompanhar pedido</a></div><div><h3>Atendimento</h3><a href="/#atendimento">Fale conosco</a><a href="/admin/">Área administrativa</a></div></div></footer>
   <div class="mobile-overlay" id="mobileOverlay"></div>
-  <script type="module" src="/assets/visual-runtime.js?v=20260915-4"></script>
-  <script type="module" src="/assets/catalog.js?v=20260915-8"></script>
+  <script type="module" src="/assets/catalog-v2.js?v=20260915-1"></script>
 </body>
 </html>
