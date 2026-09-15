@@ -15,6 +15,7 @@ const activeFilters=document.querySelector('#activeFilters');
 const sidebar=document.querySelector('#catalogSidebar');
 const overlay=document.querySelector('#mobileOverlay');
 const pageSize=18;
+const FORMAT_ORDER=['cdr','ai','psd','pdf','svg'];
 const state={q:'',category:'',featured:false,sort:'featured',offset:0,total:0,categories:[]};
 
 function esc(value=''){return String(value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
@@ -45,8 +46,42 @@ function card(item){
  const visualBadge=item.image_type==='real_photo'?'<span class="visual-badge photo">Foto do produto</span>':'<span class="visual-badge technical">Imagem ilustrativa</span>';
  const price=Number(item.starting_price||0)>0?money.format(Number(item.starting_price)):'Sob consulta';
  const variants=Number(item.variants_count||0);
- const gabaritos=item.gabaritos_url||`/gabaritos.html?slug=${encodeURIComponent(item.slug)}`;
- return `<article class="product-card"><a class="product-image" href="/produto.html?slug=${encodeURIComponent(item.slug)}">${image}${visualBadge}</a><div class="product-body"><span class="badge">${item.requires_artwork?'Personalizável':'Produto gráfico'}</span><h3><a href="/produto.html?slug=${encodeURIComponent(item.slug)}">${esc(item.name)}</a></h3><p>${esc(item.short_description||'Configure as opções disponíveis para este produto.')}</p><span class="variant-count">${variants?`${variants} opção(ões) disponível(is)`:'Configuração sob consulta'}</span><div class="price"><small>${price==='Sob consulta'?'Preço':'A partir de'}</small><strong>${price}</strong></div><div class="catalog-card-actions"><a class="configure" href="/produto.html?slug=${encodeURIComponent(item.slug)}">Configurar produto</a><a class="template-shortcut" href="${esc(gabaritos)}">Ver gabaritos</a><a class="image-shortcut" href="${esc(visual||'#')}" target="_blank" rel="noopener" ${visual?'':'aria-disabled="true"'}>Abrir imagem</a></div></div></article>`;
+ return `<article class="product-card"><a class="product-image" href="/produto.html?slug=${encodeURIComponent(item.slug)}">${image}${visualBadge}</a><div class="product-body"><span class="badge">${item.requires_artwork?'Personalizável':'Produto gráfico'}</span><h3><a href="/produto.html?slug=${encodeURIComponent(item.slug)}">${esc(item.name)}</a></h3><p>${esc(item.short_description||'Configure as opções disponíveis para este produto.')}</p><span class="variant-count">${variants?`${variants} opção(ões) disponível(is)`:'Configuração sob consulta'}</span><div class="price"><small>${price==='Sob consulta'?'Preço':'A partir de'}</small><strong>${price}</strong></div><div class="catalog-card-actions"><a class="configure" href="/produto.html?slug=${encodeURIComponent(item.slug)}">Configurar produto</a><button class="template-shortcut" type="button" data-gabarito-slug="${esc(item.slug)}" aria-expanded="false">Gabarito</button><a class="image-shortcut" href="${esc(visual||'#')}" target="_blank" rel="noopener" ${visual?'':'aria-disabled="true"'}>Abrir imagem</a></div><div class="catalog-gabaritos" hidden></div></div></article>`;
+}
+
+function inlineGabaritos(verified=[],generated=[]){
+ const files=[];
+ for(const item of verified){
+  const format=String(item.template_type||'').toLowerCase();
+  if(FORMAT_ORDER.includes(format)&&item.url)files.push({format,url:item.url,native:true});
+ }
+ for(const item of generated){
+  for(const file of item.formats||[]){
+   const format=String(file.format||'').toLowerCase();
+   if(FORMAT_ORDER.includes(format)&&file.url)files.push({format,url:file.url,native:false});
+  }
+ }
+ const seen=new Set();
+ return files.filter(file=>{const key=`${file.format}|${file.url}`;if(seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>FORMAT_ORDER.indexOf(a.format)-FORMAT_ORDER.indexOf(b.format));
+}
+
+async function toggleGabaritos(button){
+ const card=button.closest('.product-card');
+ const box=card?.querySelector('.catalog-gabaritos');
+ if(!box)return;
+ if(box.dataset.loaded){const open=box.hidden;box.hidden=!open;button.setAttribute('aria-expanded',String(open));return;}
+ button.disabled=true;
+ try{
+  const slug=String(button.dataset.gabaritoSlug||'');
+  const [verified,generated]=await Promise.allSettled([getJson(`/api/v1/products/${encodeURIComponent(slug)}/templates`),getJson(`/api/v1/products/${encodeURIComponent(slug)}/generated-gabaritos`)]);
+  const files=inlineGabaritos(verified.status==='fulfilled'?(verified.value.items||[]):[],generated.status==='fulfilled'?(generated.value.items||[]):[]);
+  box.innerHTML=files.length?files.map(file=>`<a class="template-shortcut" href="${esc(file.url)}" ${file.native?'target="_blank" rel="noopener"':'download'}>${esc(file.format.toUpperCase())}</a>`).join(''):'<span>Sem arquivo</span>';
+  box.dataset.loaded='1';
+  box.hidden=false;
+  button.setAttribute('aria-expanded','true');
+ }catch{
+  box.innerHTML='<span>Sem arquivo</span>';box.dataset.loaded='1';box.hidden=false;button.setAttribute('aria-expanded','true');
+ }finally{button.disabled=false;}
 }
 
 function syncFromUrl(){
@@ -108,6 +143,7 @@ async function apply({resetPage=true}={}){
 function openFilters(){sidebar.classList.add('open');overlay.classList.add('open');document.body.style.overflow='hidden';}
 function closeFilters(){sidebar.classList.remove('open');overlay.classList.remove('open');document.body.style.overflow='';}
 
+grid.addEventListener('click',e=>{const button=e.target.closest('[data-gabarito-slug]');if(button){e.preventDefault();toggleGabaritos(button);}});
 document.querySelector('#catalogSearch').addEventListener('submit',e=>{e.preventDefault();sidebarSearch.value=searchInput.value.trim();apply();});
 document.querySelector('#applyFilters').addEventListener('click',()=>apply());
 document.querySelector('#clearFilters').addEventListener('click',()=>{sidebarSearch.value='';searchInput.value='';featuredOnly.checked=false;const all=document.querySelector('input[name="catalogCategory"][value=""]');if(all)all.checked=true;sortEl.value='featured';apply();});
