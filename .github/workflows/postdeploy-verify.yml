@@ -1,0 +1,35 @@
+name: Central Prints Postdeploy Verify
+
+on:
+  push:
+    branches: [ops/postdeploy-verify-20260915]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-production:
+    runs-on: [self-hosted, central-prints, vps, production]
+    timeout-minutes: 10
+    steps:
+      - name: Verify deployed storefront and admin pricing
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          BASE='http://127.0.0.1:3005'
+          EXPECTED='acb70832fa554fdc4ad48b5f753f36780ac13d1a'
+          release="$(curl -fsS --max-time 10 "$BASE/api/release")"
+          echo "RELEASE=$release"
+          echo "$release" | grep -q "$EXPECTED"
+          curl -fsS --max-time 15 "$BASE/" | grep -q 'storefront-layout'
+          echo 'HOME_LAYOUT=OK'
+          curl -fsS --max-time 15 "$BASE/admin/precos-fornecedores.html" | grep -q 'Visão comercial'
+          echo 'ADMIN_COMMERCIAL_PAGE=OK'
+          code="$(curl -sS --max-time 10 -o /tmp/cp-admin-unauth.json -w '%{http_code}' "$BASE/api/v1/admin/supplier-prices/catalog")"
+          echo "ADMIN_API_UNAUTH_HTTP=$code"
+          [ "$code" = '401' ]
+          summary="$(curl -fsS --max-time 15 "$BASE/api/v1/catalog/summary")"
+          echo "CATALOG_SUMMARY=$summary"
+          echo "$summary" | grep -q '"products":1075'
+          echo "$summary" | grep -q '"variants":21329'
+          echo 'POSTDEPLOY_VERIFY=OK'
