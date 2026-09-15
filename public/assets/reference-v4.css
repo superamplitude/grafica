@@ -1,0 +1,119 @@
+/* Central Prints V4 — referência estrutural: KWG + Printi + Paulista Cartões.
+   A identidade visual continua própria da Central Prints. */
+
+/* Navegação e catálogo denso, como lojas gráficas de grande sortimento */
+.header-main{max-width:1280px}
+.nav-inner{max-width:1280px}
+.benchmark-mega-menu .mega-menu-panel{max-height:min(700px,76vh)}
+.benchmark-mega-menu .mega-menu-columns{columns:5 205px;column-gap:28px}
+.benchmark-mega-menu .mega-menu-group-title{font-size:.82rem}
+.benchmark-mega-menu .mega-menu-link{font-size:.73rem;line-height:1.25}
+.storefront-products,.category-showcase .container{max-width:1280px}
+.storefront-grid{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+.storefront-grid .simple-card .product-image{aspect-ratio:1.15/1!important}
+.storefront-grid .simple-card .product-body{padding:12px!important}
+.storefront-grid .simple-card .product-body h3{font-size:.88rem}
+
+/* Página de produto: galeria + configuração + resumo, sem tabela gigante no primeiro plano */
+.reference-product-layout{grid-template-columns:minmax(0,1.08fr) minmax(390px,.92fr);gap:34px;align-items:start}
+.reference-config-card{padding:0!important;overflow:hidden;background:#fff}
+.reference-product-head{padding:22px 24px 17px;border-bottom:1px solid var(--line)}
+.reference-product-head h1{margin:7px 0 10px!important;font-size:clamp(1.8rem,2.7vw,2.45rem)!important;line-height:1.04!important}
+.reference-product-head>p{margin:0!important;font-size:.86rem;line-height:1.5}
+.reference-product-head .product-flags{margin-top:11px}
+.reference-config-body{padding:20px 24px 24px}
+.reference-config-title{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:15px}
+.reference-config-title strong{font-size:1rem;color:var(--green)}
+.reference-config-title span{font-size:.68rem;color:var(--muted);text-align:right}
+.reference-config-stack{display:grid;gap:17px}
+.reference-choice-group{display:grid;gap:8px}
+.reference-choice-group[hidden]{display:none!important}
+.reference-choice-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.reference-choice-head strong{font-size:.79rem;color:var(--green)}
+.reference-choice-head small{font-size:.64rem;color:var(--muted)}
+.reference-choice-group select{display:none!important}
+.option-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.option-card-grid.quantity-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.option-card{position:relative;display:grid;gap:3px;min-height:52px;padding:9px 10px;border:1px solid #d7e1db;border-radius:8px;background:#fff;color:#263a31;text-align:left;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s}
+.option-card:hover{border-color:#96ad9f;background:#fbfdfc}
+.option-card.active{border:2px solid var(--green);padding:8px 9px;background:#f5faf7;box-shadow:0 0 0 2px rgba(18,60,45,.06)}
+.option-card.active:after{content:'✓';position:absolute;right:7px;top:6px;font-size:.68rem;font-weight:900;color:var(--green)}
+.option-card strong{font-size:.76rem;line-height:1.25;padding-right:13px}
+.option-card span{font-size:.62rem;color:var(--muted);line-height:1.25}
+.option-card .option-price{color:var(--green);font-weight:800}
+.option-card:disabled{opacity:.45;cursor:not-allowed;background:#f6f7f6}
+.reference-final-option{display:grid;gap:6px;font-size:.74rem;font-weight:800;color:var(--green)}
+.reference-final-option select{display:block!important;width:100%;padding:10px 11px;border:1px solid #cad8d0;border-radius:7px;background:#fff}
+.reference-variant-detail{margin-top:2px;border:1px solid #e3e9e5;background:#fafcfb}
+
+/* Gabaritos / recursos */
+.reference-resources{border:1px solid #e2e9e5;border-radius:9px;background:#fbfdfc;padding:12px 13px}
+.reference-resources[hidden]{display:none!important}
+.reference-resources-head{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.reference-resources-head strong{font-size:.78rem;color:var(--green)}
+.reference-resources-head small{font-size:.63rem;color:var(--muted)}
+.reference-resources .gabarito-format-bar{margin-top:9px!important;padding:0!important;border:0!important;background:transparent!important;display:flex!important;gap:7px!important;flex-wrap:wrap}
+.reference-resources .gabarito-format-link,.reference-resources .gabarito-format-unavailable{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:30px;border-radius:6px;border:1px solid #cbd9d1;padding:0 8px;font-size:.67rem;font-weight:900;text-decoration:none}
+.reference-resources .gabarito-format-link{background:#fff;color:var(--green)}
+.reference-resources .gabarito-format-unavailable{background:#f2f4f3;color:#a0aaa4;border-color:#e2e7e4}
+.reference-resources .gabarito-format-separator{display:none}
+
+/* Resumo do pedido inspirado no padrão dos configuradores de gráficas */
+.order-summary-card{margin-top:3px;border:1px solid #dce5df;border-radius:10px;background:#fff;overflow:hidden}
+.order-summary-head{padding:12px 14px;background:#f5f8f6;border-bottom:1px solid #dce5df;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.order-summary-head strong{font-size:.84rem;color:var(--green)}
+.order-summary-head span{font-size:.61rem;color:var(--muted)}
+.order-summary-lines{display:grid;padding:10px 14px}
+.order-summary-line{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #eef2ef;font-size:.72rem}
+.order-summary-line:last-child{border-bottom:0}
+.order-summary-line span{color:var(--muted)}
+.order-summary-line strong{color:#263a31;text-align:right}
+.order-summary-total{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;padding:13px 14px;border-top:1px solid #dce5df;background:#fbfcfb}
+.order-summary-total span{font-size:.72rem;color:var(--muted)}
+.order-summary-total strong{font-size:1.55rem;color:var(--green)}
+.order-summary-note{padding:0 14px 12px;color:var(--muted);font-size:.62rem;line-height:1.45}
+
+.reference-artwork-note{margin-top:2px}
+.reference-artwork-note span{font-size:.72rem!important}
+.reference-notes{display:grid;gap:6px;color:var(--green);font-size:.72rem;font-weight:800}
+.reference-notes textarea{min-height:70px!important;padding:9px 10px!important;border-radius:7px!important;font-size:.78rem}
+.reference-config-card .full{min-height:50px;font-size:.88rem;font-weight:900}
+.reference-config-card .safe-note{padding:0 24px 20px;margin:0}
+
+/* Conteúdo técnico abaixo, no padrão “Detalhes das opções” */
+.reference-secondary{padding-top:8px}
+.reference-details{margin:0;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
+.reference-details>summary{cursor:pointer;list-style:none;padding:17px 20px;font-weight:900;color:var(--green);display:flex;justify-content:space-between;gap:15px;align-items:center}
+.reference-details>summary::-webkit-details-marker{display:none}
+.reference-details>summary:after{content:'+';font-size:1.15rem}
+.reference-details[open]>summary:after{content:'–'}
+.reference-details[open]>summary{border-bottom:1px solid var(--line)}
+.reference-details-body{padding:18px 20px}
+.reference-guide{margin-top:18px!important}
+.reference-guide .print-guide-grid article{min-height:90px}
+.reference-guide .print-guide-grid article strong{font-size:.8rem}
+.reference-guide .print-guide-grid article span{font-size:.69rem}
+
+@media(max-width:1180px){
+  .benchmark-mega-menu .mega-menu-columns{columns:4 205px}
+  .storefront-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .reference-product-layout{grid-template-columns:minmax(0,1fr) 400px;gap:24px}
+}
+@media(max-width:920px){
+  .benchmark-mega-menu .mega-menu-columns{columns:3 205px}
+  .storefront-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .reference-product-layout{grid-template-columns:1fr}
+  .reference-config-card{position:static!important}
+}
+@media(max-width:700px){
+  .storefront-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .reference-product-head,.reference-config-body{padding-left:18px;padding-right:18px}
+  .reference-config-card .safe-note{padding-left:18px;padding-right:18px}
+  .option-card-grid.quantity-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:480px){
+  .option-card-grid,.option-card-grid.quantity-grid{grid-template-columns:1fr 1fr}
+  .storefront-grid{grid-template-columns:1fr!important}
+  .reference-config-title{align-items:flex-start;flex-direction:column;gap:3px}
+  .reference-config-title span{text-align:left}
+}
