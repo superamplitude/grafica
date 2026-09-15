@@ -1,12 +1,6 @@
 import { getDb } from '../lib/db.js';
 import { renderProductPreviewSvg, renderVariantGabaritoSvg } from '../domain/generated-assets.js';
 
-function absolutePath(request,path){
-  const proto=String(request.headers['x-forwarded-proto']||request.protocol||'https').split(',')[0].trim()||'https';
-  const host=String(request.headers['x-forwarded-host']||request.headers.host||'grafica.belastock.com.br').split(',')[0].trim();
-  return `${proto}://${host}${path}`;
-}
-
 function svgReply(reply,svg,fileName,download=false){
   reply.header('Content-Type','image/svg+xml; charset=utf-8');
   reply.header('Cache-Control','public, max-age=3600, must-revalidate');
@@ -56,8 +50,8 @@ export async function registerGeneratedAssetRoutes(app){
         side:'general',
         size_label:row.size_label||null,
         print_configuration:row.print_configuration||null,
-        url:absolutePath(request,path),
-        download_url:absolutePath(request,`${path}?download=1`),
+        url:path,
+        download_url:`${path}?download=1`,
         source:'supplier_price_table',
         note:'Dimensão final conforme tabela importada; sangria e área segura não são presumidas.'
       });

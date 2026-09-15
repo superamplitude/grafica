@@ -4,18 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Gabaritos · Super Admin · Central Prints</title>
-  <link rel="stylesheet" href="/admin/admin.css">
-  <link rel="stylesheet" href="/admin/admin-extra.css">
-  <link rel="stylesheet" href="/admin/gabaritos.css">
+  <link rel="stylesheet" href="/admin/admin.css?v=20260915-3">
+  <link rel="stylesheet" href="/admin/admin-extra.css?v=20260915-3">
+  <link rel="stylesheet" href="/admin/gabaritos.css?v=20260915-3">
 </head>
 <body class="template-admin-page">
   <div class="template-shell">
     <header class="template-topbar"><div><a href="/admin/" class="template-back">← Super Admin</a><h1>Gabaritos</h1><p>Versões técnicas por produto, com conferência obrigatória de neutralidade antes da publicação.</p></div><div class="template-user"><strong id="templateUser">Carregando…</strong><span id="templateRole"></span></div></header>
 
+    <div id="templateStorageStatus" class="storage-status checking"><strong>Armazenamento</strong><span>Verificando disponibilidade para upload de arquivos…</span></div>
+
     <section class="panel template-search-panel"><label>Produto<input id="templateProductSearch" type="search" placeholder="Buscar produto"></label><div id="templateProductList" class="template-product-list"></div></section>
 
     <section class="panel" id="templateWorkspace" hidden>
-      <div class="panel-head"><div><span class="eyebrow">Produto selecionado</span><h2 id="templateProductTitle">—</h2><p id="templateProductMeta">—</p></div><a id="templatePublicLink" class="action" target="_blank" rel="noopener">Ver produto público ↗</a></div>
+      <div class="panel-head"><div><span class="eyebrow">Produto selecionado</span><h2 id="templateProductTitle">—</h2><p id="templateProductMeta">—</p></div><div class="template-head-actions"><a id="templateGabaritosLink" class="action" target="_blank" rel="noopener">Central de gabaritos ↗</a><a id="templatePublicLink" class="action" target="_blank" rel="noopener">Ver produto público ↗</a></div></div>
       <div class="template-layout">
         <section><h3>Gabaritos cadastrados</h3><div id="templateList" class="template-list"></div></section>
         <section class="template-create-card"><h3>Adicionar versão</h3><form id="templateCreateForm">
@@ -25,12 +27,13 @@
           <div class="template-dimensions"><label>Largura (mm)<input id="templateWidth" type="number" min="0.01" step="0.01"></label><label>Altura (mm)<input id="templateHeight" type="number" min="0.01" step="0.01"></label><label>Sangria (mm)<input id="templateBleed" type="number" min="0" step="0.01"></label></div>
           <label id="templateFileWrap">Arquivo técnico<input id="templateFile" type="file" accept=".pdf,.ai,.cdr,.psd,.indd,.svg,.eps,.zip"></label>
           <label id="templateCanvaWrap" hidden>Link de modelo Canva<input id="templateCanvaUrl" type="url" placeholder="https://www.canva.com/..."></label>
+          <div id="templateUploadNotice" class="template-upload-notice" hidden><strong>Upload de arquivo indisponível.</strong><span>O armazenamento de mídia ainda não está configurado no servidor. Links do Canva continuam disponíveis.</span></div>
           <div class="template-warning"><strong>Antes de verificar:</strong> confira medidas, sangria, área segura e remova qualquer logomarca, nome, URL, código ou instrução que identifique o fornecedor.</div>
           <button class="action primary" id="templateCreateButton" type="submit">Adicionar gabarito</button><span id="templateCreateMessage"></span>
         </form></section>
       </div>
     </section>
   </div>
-  <script type="module" src="/admin/gabaritos.js"></script>
+  <script type="module" src="/admin/gabaritos.js?v=20260915-3"></script>
 </body>
 </html>
