@@ -1,0 +1,69 @@
+name: Diagnose Product Media and Templates
+
+on:
+  push:
+    branches: [diag/media-gabaritos-20260914]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, central-prints, vps, production]
+    timeout-minutes: 10
+    steps:
+      - name: Diagnose live endpoints
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          BASE='http://127.0.0.1:3005'
+          echo '=== HEALTH ==='
+          curl -fsS "$BASE/api/health"; echo
+          echo '=== PRODUCTS ==='
+          curl -fsS "$BASE/api/v1/products?limit=5" -o /tmp/products.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data=JSON.parse(fs.readFileSync('/tmp/products.json','utf8'));
+          for(const [i,p] of (data.items||[]).entries()){
+            console.log(JSON.stringify({i,slug:p.slug,name:p.name,cover_url:p.cover_url,image_url:p.image_url,image_type:p.image_type,technical_preview_url:p.technical_preview_url,gabaritos_url:p.gabaritos_url}));
+          }
+          NODE
+          echo '=== TEST FIRST 5 PRODUCT VISUALS AND GABARITOS ==='
+          node --input-type=module <<'NODE' > /tmp/targets.tsv
+          import fs from 'node:fs';
+          const data=JSON.parse(fs.readFileSync('/tmp/products.json','utf8'));
+          for(const p of (data.items||[])) console.log([p.slug,p.image_url||'',p.gabaritos_url||''].join('\t'));
+          NODE
+          while IFS=$'\t' read -r slug image gab; do
+            echo "PRODUCT=$slug"
+            if [ -n "$image" ]; then
+              path="${image#http://127.0.0.1:3005}"
+              path="${path#https://grafica.belastock.com.br}"
+              code=$(curl -sS -o /tmp/visual.out -w '%{http_code}' "$BASE$path")
+              type=$(curl -sSI "$BASE$path" | tr -d '\r' | awk -F': ' 'tolower($1)=="content-type"{print $2;exit}')
+              echo "IMAGE_HTTP=$code TYPE=$type PATH=$path BYTES=$(wc -c </tmp/visual.out)"
+            else
+              echo 'IMAGE_URL=EMPTY'
+            fi
+            if [ -n "$gab" ]; then
+              path="${gab#http://127.0.0.1:3005}"
+              path="${path#https://grafica.belastock.com.br}"
+              code=$(curl -sS -o /tmp/gabs.json -w '%{http_code}' "$BASE$path")
+              echo "GAB_LIST_HTTP=$code PATH=$path"
+              node --input-type=module <<'NODE'
+              import fs from 'node:fs';
+              let d={}; try{d=JSON.parse(fs.readFileSync('/tmp/gabs.json','utf8'))}catch{}
+              console.log('GAB_TOTAL='+(d.total??'PARSE_FAIL'));
+              const first=(d.items||[])[0]; if(first) console.log('GAB_FIRST_URL='+first.url);
+              NODE
+              first=$(node --input-type=module -e "import fs from 'node:fs';const d=JSON.parse(fs.readFileSync('/tmp/gabs.json','utf8'));process.stdout.write((d.items?.[0]?.url)||'')")
+              if [ -n "$first" ]; then
+                gpath="${first#http://127.0.0.1:3005}"
+                gpath="${gpath#https://grafica.belastock.com.br}"
+                gcode=$(curl -sS -o /tmp/gab.svg -w '%{http_code}' "$BASE$gpath")
+                gtype=$(curl -sSI "$BASE$gpath" | tr -d '\r' | awk -F': ' 'tolower($1)=="content-type"{print $2;exit}')
+                echo "GAB_FILE_HTTP=$gcode TYPE=$gtype PATH=$gpath BYTES=$(wc -c </tmp/gab.svg)"
+                head -c 120 /tmp/gab.svg | tr '\n' ' '; echo
+              fi
+            fi
+          done < /tmp/targets.tsv
