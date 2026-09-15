@@ -20,16 +20,18 @@ jobs:
           EXPECTED='acb70832fa554fdc4ad48b5f753f36780ac13d1a'
           release="$(curl -fsS --max-time 10 "$BASE/api/release")"
           echo "RELEASE=$release"
-          echo "$release" | grep -q "$EXPECTED"
-          curl -fsS --max-time 15 "$BASE/" | grep -q 'storefront-layout'
+          grep -q "$EXPECTED" <<<"$release"
+          curl -fsS --max-time 15 "$BASE/" -o /tmp/cp-home.html
+          grep -q 'storefront-layout' /tmp/cp-home.html
           echo 'HOME_LAYOUT=OK'
-          curl -fsS --max-time 15 "$BASE/admin/precos-fornecedores.html" | grep -q 'Visão comercial'
+          curl -fsS --max-time 15 "$BASE/admin/precos-fornecedores.html" -o /tmp/cp-admin-pricing.html
+          grep -q 'Visão comercial' /tmp/cp-admin-pricing.html
           echo 'ADMIN_COMMERCIAL_PAGE=OK'
           code="$(curl -sS --max-time 10 -o /tmp/cp-admin-unauth.json -w '%{http_code}' "$BASE/api/v1/admin/supplier-prices/catalog")"
           echo "ADMIN_API_UNAUTH_HTTP=$code"
           [ "$code" = '401' ]
           summary="$(curl -fsS --max-time 15 "$BASE/api/v1/catalog/summary")"
           echo "CATALOG_SUMMARY=$summary"
-          echo "$summary" | grep -q '"products":1075'
-          echo "$summary" | grep -q '"variants":21329'
+          grep -q '"products":1075' <<<"$summary"
+          grep -q '"variants":21329' <<<"$summary"
           echo 'POSTDEPLOY_VERIFY=OK'
