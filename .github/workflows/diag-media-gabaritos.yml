@@ -18,10 +18,16 @@ jobs:
           set -Eeuo pipefail
           node --input-type=module <<'NODE'
           const base='https://grafica.belastock.com.br';
+          const expected='4309492eaf09d859fe77510807c99c33df4358b1';
           const get=async(path)=>{const url=path.startsWith('http')?path:base+path;const r=await fetch(url);const buf=Buffer.from(await r.arrayBuffer());return {status:r.status,type:r.headers.get('content-type')||'',text:buf.toString('utf8'),bytes:buf.length,url};};
           const release=await get('/api/release');
           console.log('RELEASE',release.status,release.text);
-          if(!release.text.includes('40706c566294c211b3b214328dfa9dda35708613'))throw new Error('WRONG_RELEASE');
+          if(!release.text.includes(expected))throw new Error('WRONG_RELEASE');
+          const catalogHtml=await get('/catalogo.html');
+          const productHtml=await get('/produto.html?slug=adesivos-adesivo-bopp-branco-05bfd990');
+          if(catalogHtml.status!==200||!catalogHtml.text.includes('/assets/catalog.js?v=20260915-3'))throw new Error('CATALOG_CACHE_BUST_MISSING');
+          if(productHtml.status!==200||!productHtml.text.includes('/assets/product.js?v=20260915-3'))throw new Error('PRODUCT_CACHE_BUST_MISSING');
+          console.log('CACHE_BUST=OK');
           const productsRes=await get('/api/v1/products?limit=5');
           if(productsRes.status!==200)throw new Error('PRODUCTS_HTTP_'+productsRes.status);
           const products=JSON.parse(productsRes.text).items||[];
@@ -31,7 +37,7 @@ jobs:
             if(!p.image_url)throw new Error('IMAGE_URL_EMPTY_'+p.slug);
             const image=await get(p.image_url);
             console.log('IMAGE',image.status,image.type,image.bytes,p.image_url);
-            if(image.status!==200||!image.type.includes('image/svg+xml')||image.bytes<500)throw new Error('IMAGE_BAD_'+p.slug);
+            if(image.status!==200||!image.type.includes('image/svg+xml')||image.bytes<500||!image.text.includes('<svg'))throw new Error('IMAGE_BAD_'+p.slug);
             if(!image.text.includes('CENTRAL PRINTS')||!image.text.includes('Imagem técnica neutra'))throw new Error('IMAGE_CONTENT_BAD_'+p.slug);
             if(!p.gabaritos_url?.startsWith('/gabaritos.html?slug='))throw new Error('GAB_PUBLIC_LINK_BAD_'+p.slug);
             const page=await get(p.gabaritos_url);
@@ -46,7 +52,7 @@ jobs:
             if(!first?.url?.startsWith('/api/v1/gabaritos/'))throw new Error('GAB_FILE_LINK_BAD_'+p.slug);
             const file=await get(first.url);
             console.log('GAB_FILE',file.status,file.type,file.bytes,first.url);
-            if(file.status!==200||!file.type.includes('image/svg+xml')||!file.text.includes('CENTRAL PRINTS'))throw new Error('GAB_FILE_BAD_'+p.slug);
+            if(file.status!==200||!file.type.includes('image/svg+xml')||file.bytes<500||!file.text.includes('<svg'))throw new Error('GAB_FILE_BAD_'+p.slug);
           }
           const pageJs=await get('/assets/gabaritos.js?v=20260915-3');
           const pageCss=await get('/assets/gabaritos.css?v=20260915-3');
