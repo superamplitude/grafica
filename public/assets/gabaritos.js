@@ -9,17 +9,23 @@ const verifiedGrid=document.querySelector('#verifiedTemplateGrid');
 const generatedSection=document.querySelector('#generatedTemplates');
 const generatedGrid=document.querySelector('#generatedTemplateGrid');
 
+const FORMAT_LABELS={pdf:'PDF',svg:'SVG',eps:'EPS',cdr:'CDR',ai:'AI',psd:'PSD',indd:'INDD',canva:'Canva',other:'Arquivo'};
 function esc(value=''){return String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));}
 async function api(url){const response=await fetch(url,{headers:{Accept:'application/json'}});if(!response.ok)throw new Error(`HTTP_${response.status}`);return response.json();}
-function fileLabel(item){return item.version_label||item.label||String(item.template_type||'arquivo').toUpperCase();}
+function formatLabel(type){return FORMAT_LABELS[String(type||'').toLowerCase()]||String(type||'ARQUIVO').toUpperCase();}
+function fileLabel(item){return item.version_label||item.label||formatLabel(item.template_type);}
 function verifiedCard(item){
   const dims=item.width_mm&&item.height_mm?`${item.width_mm} × ${item.height_mm} mm`:'Medidas no próprio arquivo';
   const side={front:'Frente',back:'Verso',duplex:'Frente e verso',general:'Geral'}[item.side]||item.side||'Geral';
-  const action=String(item.template_type||'').toLowerCase()==='canva'?'Abrir modelo':'Abrir arquivo';
-  return `<article class="template-public-card verified"><div class="template-file-icon">✓</div><div><span class="template-kind">Arquivo homologado</span><h3>${esc(fileLabel(item))}</h3><p>${esc(side)} · ${esc(dims)}</p>${item.bleed_mm!=null?`<small>Sangria informada: ${esc(item.bleed_mm)} mm</small>`:'<small>Confira sangria e área segura no arquivo.</small>'}</div><div class="template-card-actions"><a class="btn primary" href="${esc(item.url)}" target="_blank" rel="noopener">${action}</a></div></article>`;
+  const fmt=formatLabel(item.template_type);
+  const isCanva=String(item.template_type||'').toLowerCase()==='canva';
+  const action=isCanva?'Abrir modelo':`Baixar ${fmt}`;
+  return `<article class="template-public-card verified"><div class="template-file-icon format">${esc(fmt)}</div><div><span class="template-kind">Arquivo homologado</span><h3>${esc(fileLabel(item))}</h3><p>${esc(side)} · ${esc(dims)}</p>${item.bleed_mm!=null?`<small>Sangria informada: ${esc(item.bleed_mm)} mm</small>`:'<small>Confira sangria e área segura no arquivo.</small>'}</div><div class="template-card-actions"><a class="btn primary" href="${esc(item.url)}" ${isCanva?'target="_blank" rel="noopener"':'download'}>${action}</a></div></article>`;
 }
 function generatedCard(item){
-  return `<article class="template-public-card"><div class="template-file-icon svg">SVG</div><div><span class="template-kind">Dimensional gerado</span><h3>${esc(item.size_label||'Medida da tabela')}</h3><p>${esc(item.print_configuration||'Configuração de impressão')}</p><small>Código ${esc(item.code||'—')} · sem sangria presumida</small></div><div class="template-card-actions"><a class="btn secondary" href="${esc(item.url)}" target="_blank" rel="noopener">Abrir</a><a class="btn primary" href="${esc(item.download_url||`${item.url}?download=1`)}">Baixar SVG</a></div></article>`;
+  const formats=(item.formats||[]).filter(f=>f?.url);
+  const buttons=formats.length?formats.map(f=>`<a class="btn ${f.format==='svg'?'primary':'secondary'} format-download" href="${esc(f.url)}" download><strong>${esc(f.label||formatLabel(f.format))}</strong><small>${f.vector?'vetorial':'editável'}</small></a>`).join(''):`<a class="btn primary" href="${esc(item.download_url||`${item.url}?download=1`)}" download>Baixar SVG</a>`;
+  return `<article class="template-public-card"><div class="template-file-icon svg">ARQ</div><div><span class="template-kind">Gabarito para download</span><h3>${esc(item.size_label||'Medida da tabela')}</h3><p>${esc(item.print_configuration||'Configuração de impressão')}</p><small>Código ${esc(item.code||'—')} · dimensão final da tabela</small><small class="format-note">SVG e EPS são vetoriais e abrem no CorelDRAW. CDR/AI nativos aparecem quando houver arquivo original homologado.</small></div><div class="template-card-actions format-actions">${buttons}</div></article>`;
 }
 
 async function load(){
